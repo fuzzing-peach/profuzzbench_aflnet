@@ -1,0 +1,58 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug profuzzbench_plot exec",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/analysis/profuzzbench_plot.py",
+            "args": [
+                "-t",
+                "exec",
+                "-i",
+                "${workspaceFolder}/results-lightftp/results_exec.csv",
+                "-p",
+                "lightftp",
+                "-r",
+                "4",
+                "-c",
+                "60",
+                "-s",
+                "1",
+                "-o",
+                "exec_over_time.jpg"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "python": "/data/exp/dkzou/anaconda3/envs/ppf/bin/python"
+        },
+        {
+            "name": "Debug profuzzbench_plot cov",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/analysis/profuzzbench_plot.py",
+            "args": [
+                "-t",
+                "cov",
+                "-i",
+                "${workspaceFolder}/results-lightftp/results_cov.csv",
+                "-p",
+                "lightftp",
+                "-r",
+                "4",
+                "-c",
+                "60",
+                "-s",
+                "1",
+                "-o",
+                "cov_over_time.jpg"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "python": "/data/exp/dkzou/anaconda3/envs/ppf/bin/python"
+        }
+    ]
+}

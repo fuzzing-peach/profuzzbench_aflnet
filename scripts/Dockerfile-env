@@ -1,0 +1,132 @@
+FROM ubuntu:22.04
+
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG DNS_SERVER
+
+RUN test -z "${DNS_SERVER:-}" || echo "nameserver ${DNS_SERVER}" >> /etc/resolv.conf
+
+# Change the Debian package mirror
+RUN apt update && apt install -y apt-transport-https ca-certificates
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.seu.edu.cn@g' /etc/apt/sources.list && apt clean
+
+# LLVM-17
+RUN apt update && apt install -y --no-install-recommends wget gnupg2 && rm -rf /var/lib/apt/lists
+RUN echo deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main >> /etc/apt/sources.list
+RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+
+# Install common dependencies
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt update && apt install -y \
+    apt-utils git build-essential curl libgnutls28-dev libssl-dev sudo libtool libtool-bin libglib2.0-dev bison flex automake libpixman-1-dev gcc-9-plugin-dev cgroup-tools \
+    libllvm-17-ocaml-dev libllvm17 llvm-17 llvm-17-dev llvm-17-doc llvm-17-examples llvm-17-runtime \
+    clang-17 clang-tools-17 clang-17-doc libclang-common-17-dev libclang-17-dev libclang1-17 clang-format-17 python3-clang-17 clangd-17 clang-tidy-17 \
+    libclang-rt-17-dev lldb-17 lld-17 libc++-17-dev libc++abi-17-dev \
+    rsync autopoint gperf autoconf texinfo gettext \
+    pkg-config libz-dev \
+    python3 python3-pip python3-dev python3-setuptools python-is-python3 \
+    openssh-server ncat netcat openssl \
+    vim nano screen htop man wget httpie bash-completion ripgrep \
+    gdb \
+    graphviz-dev libcap-dev libpcap-dev tcpdump \
+    iputils-ping telnet net-tools \
+    strace zsh autojump \
+    && rm -rf /var/lib/apt/lists
+
+RUN pip3 install -i https://mirrors.aliyun.com/pypi/simple gcovr
+
+RUN update-alternatives --install /usr/bin/clang clang $(which clang-17) 1 && \
+    update-alternatives --install /usr/bin/clang++ clang++ $(which clang++-17) 1 && \
+    update-alternatives --install /usr/bin/llvm-config llvm-config $(which llvm-config-17) 1 && \
+    update-alternatives --install /usr/bin/llvm-symbolizer llvm-symbolizer $(which llvm-symbolizer-17) 1 && \
+    update-alternatives --install /usr/bin/llvm-cov llvm-cov $(which llvm-cov-17) 1 && \
+    update-alternatives --install /usr/bin/llvm-profdata llvm-profdata $(which llvm-profdata-17) 1
+
+# Users
+##############
+# Add a new user ubuntu, pass: ubuntu
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+RUN groupadd -g ${GROUP_ID} ubuntu && \
+    useradd -u ${USER_ID} -rm -d /home/ubuntu -s /bin/zsh -g ubuntu -G sudo ubuntu -p "$(openssl passwd -1 ubuntu)" && \
+    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+RUN test -z "${HTTP_PROXY:-}" || git config --global http.proxy ${HTTP_PROXY}
+RUN test -z "${HTTPS_PROXY:-}" || git config --global https.proxy ${HTTPS_PROXY}    
+
+RUN chmod 777 /tmp
+
+# Use ubuntu as default username
+USER ubuntu
+WORKDIR /home/ubuntu
+
+# RUN test -z "${DNS_SERVER:-}" || 
+
+##############
+# End of user setup
+
+# Environments and fuzzer tools
+##############
+ARG MAKE_OPT="-j"
+COPY patches /tmp/patches
+
+# AFLNet
+RUN git clone https://github.com/aflnet/aflnet.git && \
+    cd aflnet && \
+    git checkout 62d63a59230bb5f5c6e54cddd381b9425dba3726 && \
+    git apply /tmp/patches/aflnet.patch && \
+    make clean all $MAKE_OPT && \
+    cd llvm_mode && make $MAKE_OPT
+
+# StateAFL
+# ENV STATEAFL_CFLAGS="-DENABLE_TRACE_GLOBAL_DATA -DBLACKLIST_ALLOC_SITES -DBLACKLIST_GLOBALS"
+# RUN sudo apt install -y wireshark-cli && sudo pip3 install -i https://mirrors.aliyun.com/pypi/simple --break-system-packages pyshark
+# RUN git clone https://github.com/stateafl/stateafl.git && \
+#     cd stateafl && \
+#     git checkout d923e22f7b2688db45b08f3fa3a29a566e7ff3a4 && \
+#     git submodule init && \
+#     git submodule update && \
+#     git apply /tmp/patches/stateafl.patch && \
+#     make clean all $MAKE_OPT && \
+#     cd llvm_mode && \
+#     rm -f libmvptree.a containers.a libtlsh.a && \
+#     cd tlsh && \
+#     git apply /tmp/patches/tlsh.patch && \
+#     cd .. && \
+#     make $MAKE_OPT
+
+# SGFuzz
+# RUN git clone https://github.com/bajinsheng/SGFuzz.git && \
+#     cd SGFuzz && \
+#     git checkout 00dbbd70ba79f1bcff3f7dfdb4fda0645cf91225 && \
+#     git apply /tmp/patches/sgfuzz.patch && \
+#     ./build.sh && \
+#     sudo cp libsfuzzer.a /usr/lib/libsFuzzer.a
+
+# # Install hongfuzz netdrive that is used by SGFuzz
+# RUN git clone https://github.com/google/honggfuzz.git && \
+#     cd honggfuzz && \
+#     git checkout 6f89ccc9c43c6c1d9f938c81a47b72cd5ada61ba && \
+#     CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address" make libhfcommon/libhfcommon.a && \
+#     CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address -DHFND_RECVTIME=1" make libhfnetdriver/libhfnetdriver.a && \
+#     sudo mv libhfcommon/libhfcommon.a /usr/lib/libhfcommon.a && \
+#     sudo mv libhfnetdriver/libhfnetdriver.a /usr/lib/libhfnetdriver.a
+
+# # TLS-Anvil
+# # TODO: change the maven mirror ?
+# RUN apt install -y openjdk-11-jdk maven
+# RUN git clone https://github.com/tls-attacker/TLS-Anvil.git --depth=1 && \
+#     cd TLS-Anvil && \
+#     mvn install -DskipTests -Dspotless.apply.skip
+
+# # tlsfuzzer
+# RUN pip3 install --pre tlslite-ng && \
+#     git clone https://github.com/tlsfuzzer/tlsfuzzer.git --depth=1
+
+# # Rust
+# ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
+#     RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
+# RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain nightly-2024-02-14 && \
+#     source "$HOME/.cargo/env"
+
+# COPY . /home/ubuntu/profuzzbench
