@@ -2,13 +2,13 @@ FROM ubuntu:22.04
 
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
-ARG DNS_SERVER
 
-RUN test -z "${DNS_SERVER:-}" || echo "nameserver ${DNS_SERVER}" >> /etc/resolv.conf
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTPS_PROXY}
 
 # Change the Debian package mirror
 RUN apt update && apt install -y apt-transport-https ca-certificates
-RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.seu.edu.cn@g' /etc/apt/sources.list && apt clean
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.list && apt clean
 
 # LLVM-17
 RUN apt update && apt install -y --no-install-recommends wget gnupg2 && rm -rf /var/lib/apt/lists
@@ -42,25 +42,26 @@ RUN update-alternatives --install /usr/bin/clang clang $(which clang-17) 1 && \
     update-alternatives --install /usr/bin/llvm-cov llvm-cov $(which llvm-cov-17) 1 && \
     update-alternatives --install /usr/bin/llvm-profdata llvm-profdata $(which llvm-profdata-17) 1
 
+RUN chmod 777 /tmp
+
+RUN echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" > /etc/apt/apt.conf.d/99proxy && \
+    echo "Acquire::ftp::Proxy \"${HTTP_PROXY}\";" >> /etc/apt/apt.conf.d/99proxy && \
+    echo "Acquire::https::Proxy \"${HTTP_PROXY}\";" >> /etc/apt/apt.conf.d/99proxy
+
 # Users
 ##############
 # Add a new user ubuntu, pass: ubuntu
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 RUN groupadd -g ${GROUP_ID} ubuntu && \
-    useradd -u ${USER_ID} -rm -d /home/ubuntu -s /bin/zsh -g ubuntu -G sudo ubuntu -p "$(openssl passwd -1 ubuntu)" && \
+    useradd -u ${USER_ID} -rm -d /home/ubuntu -s /bin/bash -g ubuntu -G sudo ubuntu -p "$(openssl passwd -1 ubuntu)" && \
     echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-
-RUN test -z "${HTTP_PROXY:-}" || git config --global http.proxy ${HTTP_PROXY}
-RUN test -z "${HTTPS_PROXY:-}" || git config --global https.proxy ${HTTPS_PROXY}    
-
-RUN chmod 777 /tmp
 
 # Use ubuntu as default username
 USER ubuntu
 WORKDIR /home/ubuntu
 
-# RUN test -z "${DNS_SERVER:-}" || 
+RUN git config --global http.version HTTP/1.1 
 
 ##############
 # End of user setup
@@ -78,55 +79,50 @@ RUN git clone https://github.com/aflnet/aflnet.git && \
     make clean all $MAKE_OPT && \
     cd llvm_mode && make $MAKE_OPT
 
-# StateAFL
-# ENV STATEAFL_CFLAGS="-DENABLE_TRACE_GLOBAL_DATA -DBLACKLIST_ALLOC_SITES -DBLACKLIST_GLOBALS"
-# RUN sudo apt install -y wireshark-cli && sudo pip3 install -i https://mirrors.aliyun.com/pypi/simple --break-system-packages pyshark
-# RUN git clone https://github.com/stateafl/stateafl.git && \
-#     cd stateafl && \
-#     git checkout d923e22f7b2688db45b08f3fa3a29a566e7ff3a4 && \
-#     git submodule init && \
-#     git submodule update && \
-#     git apply /tmp/patches/stateafl.patch && \
-#     make clean all $MAKE_OPT && \
-#     cd llvm_mode && \
-#     rm -f libmvptree.a containers.a libtlsh.a && \
-#     cd tlsh && \
-#     git apply /tmp/patches/tlsh.patch && \
-#     cd .. && \
-#     make $MAKE_OPT
+# # StateAFL
+# # ENV STATEAFL_CFLAGS="-DENABLE_TRACE_GLOBAL_DATA -DBLACKLIST_ALLOC_SITES -DBLACKLIST_GLOBALS"
+
+RUN sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y tshark && sudo pip3 install -i https://mirrors.aliyun.com/pypi/simple pyshark
+# TODO: error: corrupt patch at line 835
+RUN git clone https://github.com/stateafl/stateafl.git --depth=1 && \
+    cd stateafl && \
+    git checkout d923e22f7b2688db45b08f3fa3a29a566e7ff3a4 && \
+    git submodule init && \
+    git submodule update && \
+    git apply /tmp/patches/stateafl.patch
 
 # SGFuzz
-# RUN git clone https://github.com/bajinsheng/SGFuzz.git && \
-#     cd SGFuzz && \
-#     git checkout 00dbbd70ba79f1bcff3f7dfdb4fda0645cf91225 && \
-#     git apply /tmp/patches/sgfuzz.patch && \
-#     ./build.sh && \
-#     sudo cp libsfuzzer.a /usr/lib/libsFuzzer.a
+RUN git clone https://github.com/bajinsheng/SGFuzz.git --depth=1 && \
+    cd SGFuzz && \
+    git checkout 00dbbd70ba79f1bcff3f7dfdb4fda0645cf91225 && \
+    git apply /tmp/patches/sgfuzz.patch && \
+    ./build.sh && \
+    sudo cp libsfuzzer.a /usr/lib/libsFuzzer.a
 
 # # Install hongfuzz netdrive that is used by SGFuzz
-# RUN git clone https://github.com/google/honggfuzz.git && \
-#     cd honggfuzz && \
-#     git checkout 6f89ccc9c43c6c1d9f938c81a47b72cd5ada61ba && \
-#     CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address" make libhfcommon/libhfcommon.a && \
-#     CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address -DHFND_RECVTIME=1" make libhfnetdriver/libhfnetdriver.a && \
-#     sudo mv libhfcommon/libhfcommon.a /usr/lib/libhfcommon.a && \
-#     sudo mv libhfnetdriver/libhfnetdriver.a /usr/lib/libhfnetdriver.a
+RUN git clone https://github.com/google/honggfuzz.git --depth=1 && \
+    cd honggfuzz && \
+    CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address" make libhfcommon/libhfcommon.a && \
+    CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address -DHFND_RECVTIME=1" make libhfnetdriver/libhfnetdriver.a && \
+    sudo mv libhfcommon/libhfcommon.a /usr/lib/libhfcommon.a && \
+    sudo mv libhfnetdriver/libhfnetdriver.a /usr/lib/libhfnetdriver.a
 
 # # TLS-Anvil
 # # TODO: change the maven mirror ?
-# RUN apt install -y openjdk-11-jdk maven
-# RUN git clone https://github.com/tls-attacker/TLS-Anvil.git --depth=1 && \
-#     cd TLS-Anvil && \
-#     mvn install -DskipTests -Dspotless.apply.skip
+RUN sudo apt install -y openjdk-11-jdk maven
+RUN git clone https://github.com/tls-attacker/TLS-Anvil.git --depth=1 && \
+    cd TLS-Anvil && \
+    mvn install -DskipTests -Dspotless.apply.skip
 
 # # tlsfuzzer
-# RUN pip3 install --pre tlslite-ng && \
-#     git clone https://github.com/tlsfuzzer/tlsfuzzer.git --depth=1
+RUN pip3 install -i https://mirrors.aliyun.com/pypi/simple --pre tlslite-ng && \
+    git clone https://github.com/tlsfuzzer/tlsfuzzer.git --depth=1
 
-# # Rust
-# ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
-#     RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
-# RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain nightly-2024-02-14 && \
-#     source "$HOME/.cargo/env"
+# Rust
+ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
+    RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain nightly-2024-02-14 && \
+    . "$HOME/.cargo/env"
 
-# COPY . /home/ubuntu/profuzzbench
+RUN echo "1"
+COPY . /home/ubuntu/profuzzbench

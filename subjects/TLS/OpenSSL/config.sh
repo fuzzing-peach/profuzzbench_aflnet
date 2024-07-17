@@ -14,6 +14,10 @@ function get_source {
     popd > /dev/null
 }
 
+function install_dependencies {
+    echo "No dependencies"
+}
+
 function build_aflnet {
     mkdir -p aflnet
     rm -rf aflnet/*
@@ -42,6 +46,14 @@ function build_stateafl {
     # TODO:
 
     popd > /dev/null
+}
+
+function build_sgfuzz {
+    echo "Not implemented"
+}
+
+function build_pingu {
+    echo "Not implemented"
 }
 
 function build_gcov {

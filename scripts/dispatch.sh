@@ -13,7 +13,7 @@ function in_subshell() {
 
 function check_config_exported_functions() {
     local failed=0
-    for fn_name in "install_dependencies build_pingu build_aflnet build_stateafl build_sgfuzz build_gcov build_vanilla"; do
+    for fn_name in "get_source install_dependencies build_pingu build_aflnet build_stateafl build_sgfuzz build_gcov build_vanilla"; do
         if ! type $fn_name > /dev/null; then
             echo "[!] Target config does not define function $fn_name"
             failed=1

@@ -26,6 +26,10 @@ function get_arguments_after_double_dash {
   local args=()
 
   while [[ "$1" != "--" ]]; do
+    if [[ -z "$1" ]]; then
+      echo ""
+      return
+    fi
     shift
   done
 
@@ -36,5 +40,25 @@ function get_arguments_after_double_dash {
     shift
   done
 
-  echo "${args[@]}"
+  echo -n "${args[@]}"
+}
+
+function get_args_before_double_dash() {
+    # 初始化一个空数组来存储参数
+    local args=()
+    
+    # 遍历所有参数
+    while [[ $# -gt 0 ]]; do
+        if [[ $1 == "--" ]]; then
+            # 遇到 -- 时，停止遍历
+            break
+        fi
+        # 将参数添加到数组中
+        args+=("$1")
+        # 移动到下一个参数
+        shift
+    done
+    
+    # 打印参数列表
+    echo -n "${args[@]}"
 }
