@@ -26,7 +26,7 @@ function get_arguments_after_double_dash {
   local args=()
 
   while [[ "$1" != "--" ]]; do
-    if [[ -z "$1" ]]; then
+    if [[ -z $1 ]]; then
       echo ""
       return
     fi
@@ -52,6 +52,10 @@ function get_args_before_double_dash() {
         if [[ $1 == "--" ]]; then
             # 遇到 -- 时，停止遍历
             break
+        fi
+        if [[ -z $1 ]]; then
+          echo ""
+          return
         fi
         # 将参数添加到数组中
         args+=("$1")

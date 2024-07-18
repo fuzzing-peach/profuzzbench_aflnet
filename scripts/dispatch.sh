@@ -7,7 +7,8 @@ cd ..
 
 function in_subshell() {
     (
-        $1
+        echo "[+] Running in subshell: $@"
+        $@
     )
 }
 
@@ -48,9 +49,10 @@ check_config_exported_functions
 
 cd $HOME
 mode=${2-"all"}
+shift 2
 case $mode in
     src)
-        in_subshell get_source
+        in_subshell get_source "$@"
     ;;
     deps)
         in_subshell install_dependencies

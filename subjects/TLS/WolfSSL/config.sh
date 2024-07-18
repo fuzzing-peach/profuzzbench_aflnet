@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 
-set -eu
+set -e
 
 function get_source {
     mkdir -p src
     pushd src > /dev/null
     git clone https://github.com/wolfSSL/wolfssl.git
     cd wolfssl
-    if [["$#" -lt 1 && "$1" == "checkout" ]]; then
-        shift
-        git checkout "$@"
+    if [[ -n "$1" ]]; then
+        git checkout "$1"
     fi
     popd > /dev/null
 }
@@ -24,12 +23,16 @@ function build_aflnet {
     export AFL_SKIP_CPUFREQ=1
     export AFL_NO_AFFINITY=1
     export CC=afl-clang-fast 
-    export AFL_USE_ASAN=1 
+    export AFL_USE_ASAN=1
 
     ./configure --enable-static --enable-shared=no
     make examples/server/server -j
 
     popd > /dev/null
+}
+
+function run_aflnet {
+    echo "Not implemented"
 }
 
 function build_stateafl {
@@ -68,4 +71,16 @@ function build_vanilla {
     make examples/server/server -j
 
     popd > /dev/null
+}
+
+function build_pingu {
+    echo "Not implemented"
+}
+
+function build_sgfuzz {
+    echo "Not implemented"
+}
+
+function install_dependencies {
+    echo "Not implemented"
 }
