@@ -9,8 +9,9 @@ ARG VERSION
 ENV FUZZER=${FUZZER}
 ENV TARGET=${TARGET}
 ENV VERSION=${VERSION}
+ENV TERM=xterm
 
-RUN bash scripts/dispatch.sh subjects/${TARGET} src ${VERSION}
-# RUN bash scripts/dispatch.sh subjects/${TARGET} deps
-# RUN bash scripts/dispatch.sh subjects/${TARGET} gcov
-# RUN bash scripts/dispatch.sh subjects/${TARGET} ${FUZZER}
+RUN scripts/dispatch.sh subjects/${TARGET} build deps
+RUN scripts/dispatch.sh subjects/${TARGET} build vanilla
+RUN scripts/dispatch.sh subjects/${TARGET} build gcov
+RUN scripts/dispatch.sh subjects/${TARGET} build ${FUZZER}

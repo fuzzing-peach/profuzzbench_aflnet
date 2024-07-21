@@ -8,7 +8,7 @@ source scripts/utils.sh
 
 # Parameters after -- is passed directly to the docker build
 args=($(get_args_before_double_dash "$@"))
-docker_args=$(get_arguments_after_double_dash "$@")
+docker_args=$(get_args_after_double_dash "$@")
 
 opt_args=`getopt -o f:t:v: -l fuzzer:,target:,version: --name "$0" -- "${args[@]}"`
 if [ $? != 0 ]; then

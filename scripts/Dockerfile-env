@@ -1,10 +1,22 @@
-FROM ubuntu:22.04
+FROM git as openssl_repo
 
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 
 ENV HTTP_PROXY=${HTTP_PROXY}
 ENV HTTPS_PROXY=${HTTPS_PROXY}
+
+RUN mkdir -p /tmp/repo && \
+    git clone https://gitee.com/sz_abundance/openssl.git && \
+    mv openssl /tmp/repo
+
+FROM git as wolfssl_repo
+
+RUN mkdir -p /tmp/repo && \
+    git clone https://gitee.com/zzroot/wolfssl.git && \
+    mv wolfssl /tmp/repo
+
+FROM ubuntu:22.04
 
 # Change the Debian package mirror
 RUN apt update && apt install -y apt-transport-https ca-certificates
@@ -22,6 +34,7 @@ RUN apt update && apt install -y \
     libllvm-17-ocaml-dev libllvm17 llvm-17 llvm-17-dev llvm-17-doc llvm-17-examples llvm-17-runtime \
     clang-17 clang-tools-17 clang-17-doc libclang-common-17-dev libclang-17-dev libclang1-17 clang-format-17 python3-clang-17 clangd-17 clang-tidy-17 \
     libclang-rt-17-dev lldb-17 lld-17 libc++-17-dev libc++abi-17-dev \
+    cmake \
     rsync autopoint gperf autoconf texinfo gettext \
     pkg-config libz-dev \
     python3 python3-pip python3-dev python3-setuptools python-is-python3 \
@@ -66,13 +79,21 @@ RUN git config --global http.version HTTP/1.1
 ##############
 # End of user setup
 
+# Code
+##############
+RUN mkdir -p repo
+COPY --from=openssl_repo /tmp/repo/openssl repo/openssl
+COPY --from=wolfssl_repo /tmp/repo/wolfssl repo/wolfssl
+RUN sudo chown -R ubuntu:ubuntu repo/openssl && \ 
+    sudo chown -R ubuntu:ubuntu repo/wolfssl
+
 # Environments and fuzzer tools
 ##############
 ARG MAKE_OPT="-j"
 COPY patches /tmp/patches
 
 # AFLNet
-RUN git clone https://github.com/aflnet/aflnet.git && \
+RUN git clone https://gitee.com/skyworld123/aflnet.git && \
     cd aflnet && \
     git checkout 62d63a59230bb5f5c6e54cddd381b9425dba3726 && \
     git apply /tmp/patches/aflnet.patch && \
@@ -83,16 +104,22 @@ RUN git clone https://github.com/aflnet/aflnet.git && \
 # # ENV STATEAFL_CFLAGS="-DENABLE_TRACE_GLOBAL_DATA -DBLACKLIST_ALLOC_SITES -DBLACKLIST_GLOBALS"
 
 RUN sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y tshark && sudo pip3 install -i https://mirrors.aliyun.com/pypi/simple pyshark
-# TODO: error: corrupt patch at line 835
-RUN git clone https://github.com/stateafl/stateafl.git --depth=1 && \
+RUN git clone https://gitee.com/zhangadiu/stateafl.git --depth=1 && \
     cd stateafl && \
     git checkout d923e22f7b2688db45b08f3fa3a29a566e7ff3a4 && \
     git submodule init && \
     git submodule update && \
-    git apply /tmp/patches/stateafl.patch
+    git apply /tmp/patches/stateafl.patch && \
+    make -j  && \
+    cd llvm_mode  && \
+    rm -f libmvptree.a containers.a libtlsh.a && \
+    cd tlsh && \
+    git apply /tmp/patches/tlsh.patch && \
+    cd .. && \
+    make -j
 
 # SGFuzz
-RUN git clone https://github.com/bajinsheng/SGFuzz.git --depth=1 && \
+RUN git clone https://gitee.com/pine404/SGFuzz.git --depth=1 && \
     cd SGFuzz && \
     git checkout 00dbbd70ba79f1bcff3f7dfdb4fda0645cf91225 && \
     git apply /tmp/patches/sgfuzz.patch && \
@@ -100,21 +127,23 @@ RUN git clone https://github.com/bajinsheng/SGFuzz.git --depth=1 && \
     sudo cp libsfuzzer.a /usr/lib/libsFuzzer.a
 
 # # Install hongfuzz netdrive that is used by SGFuzz
-RUN git clone https://github.com/google/honggfuzz.git --depth=1 && \
+RUN git clone https://gitee.com/kherrisan/honggfuzz.git --depth=1 && \
     cd honggfuzz && \
     CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address" make libhfcommon/libhfcommon.a && \
     CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address -DHFND_RECVTIME=1" make libhfnetdriver/libhfnetdriver.a && \
     sudo mv libhfcommon/libhfcommon.a /usr/lib/libhfcommon.a && \
     sudo mv libhfnetdriver/libhfnetdriver.a /usr/lib/libhfnetdriver.a
 
-# # TLS-Anvil
-# # TODO: change the maven mirror ?
+# TLS-Anvil
+# Change the maven mirror ?
+# de.rub.nds.* package may not be found in the aliyun maven registry.
 RUN sudo apt install -y openjdk-11-jdk maven
-RUN git clone https://github.com/tls-attacker/TLS-Anvil.git --depth=1 && \
+RUN git clone https://gitee.com/kherrisan/TLS-Anvil.git && \
     cd TLS-Anvil && \
+    git checkout v1.2.9 && \
     mvn install -DskipTests -Dspotless.apply.skip
 
-# # tlsfuzzer
+# tlsfuzzer
 RUN pip3 install -i https://mirrors.aliyun.com/pypi/simple --pre tlslite-ng && \
     git clone https://github.com/tlsfuzzer/tlsfuzzer.git --depth=1
 
@@ -122,7 +151,30 @@ RUN pip3 install -i https://mirrors.aliyun.com/pypi/simple --pre tlslite-ng && \
 ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
     RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain nightly-2024-02-14 && \
-    . "$HOME/.cargo/env"
+    printf "[source.crates-io]\nreplace-with = \"ustc\"\n\n[source.ustc]\nregistry = \"sparse+https://mirrors.ustc.edu.cn/crates.io-index/\"" > "$HOME/.cargo/config.toml"
+ENV PATH="/home/ubuntu/.cargo/bin:${PATH}"
 
-RUN echo "asdf"
+# DY fuzzer
+
+
+# Pingu: My Fuzzer :)
+ARG GITHUB_TOKEN
+RUN git clone https://Kherrisan:$GITHUB_TOKEN@github.com/Kherrisan/pingu.git && \
+    cd pingu && \
+    git submodule init && git submodule update && \
+    cd fuzztruction && \
+    git submodule init && git submodule update && \
+    cd ../pingu-fuzzer && \
+    cargo build
+RUN sudo touch "/etc/ld.so.conf.d/pingu.conf" && \
+    echo "/home/ubuntu/pingu/target/debug" | sudo tee "/etc/ld.so.conf.d/pingu.conf" && \
+    sudo ldconfig
+
+ENV PATH="/home/ubuntu/pingu/target/debug:${PATH}"
+
 COPY . /home/ubuntu/profuzzbench
+
+RUN echo "abc12dd"
+
+RUN sudo chown -R ubuntu:ubuntu /home/ubuntu/profuzzbench && \
+    sudo chmod +x /home/ubuntu/profuzzbench/scripts/*.sh

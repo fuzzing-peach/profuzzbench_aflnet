@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
-set -eu
+set -e
 set -o pipefail
 cd $(dirname $0)
 cd ..
+source scripts/utils.sh
 
 function in_subshell() {
     (
@@ -14,7 +15,7 @@ function in_subshell() {
 
 function check_config_exported_functions() {
     local failed=0
-    for fn_name in "get_source install_dependencies build_pingu build_aflnet build_stateafl build_sgfuzz build_gcov build_vanilla"; do
+    for fn_name in "install_dependencies build_pingu build_aflnet build_stateafl build_sgfuzz build_gcov build_vanilla"; do
         if ! type $fn_name > /dev/null; then
             echo "[!] Target config does not define function $fn_name"
             failed=1
@@ -48,39 +49,37 @@ source $cfg_path
 check_config_exported_functions
 
 cd $HOME
-mode=${2-"all"}
-shift 2
+cmd=${2-"build"}
+mode=${3-"all"}
+shift 3
 case $mode in
-    src)
-        in_subshell get_source "$@"
-    ;;
     deps)
-        in_subshell install_dependencies
+        in_subshell install_dependencies "$@"
     ;;
     pingu)
         # Pingu is the name of my fuzzer :)
-        in_subshell build_pingu
+        in_subshell "$cmd"_pingu "$@"
     ;;
     aflnet)
-        in_subshell build_aflnet
+        in_subshell "$cmd"_aflnet "$@"
     ;;
     stateafl)
         # StateAFL: https://github.com/stateafl/stateafl
-        in_subshell build_stateafl
+        in_subshell "$cmd"_stateafl "$@"
     ;;
     sgfuzz)
         # SGFuzz: https://github.com/bajinsheng/SGFuzz
         # The configuration steps could also be referenced by https://github.com/fuzztruction/fuzztruction-net/blob/main/Dockerfile
-        in_subshell build_sgfuzz
+        in_subshell "$cmd"_sgfuzz "$@"
     ;;
     vanilla)
         # Build vanilla version
         # Vanilla means the true original version, without any instrumentation, hooking and analysis.
-        in_subshell build_vanilla
+        in_subshell build_vanilla "$@"
     ;;
     gcov)
         # Build the gcov version, which is used to be computed coverage upon.
-        in_subshell build_gcov
+        in_subshell build_gcov "$@"
     ;;
     all)
         in_subshell get_source || true
