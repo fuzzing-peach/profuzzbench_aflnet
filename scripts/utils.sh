@@ -15,6 +15,10 @@ function log_success {
   echo "${text_bold}${text_green}${1}${text_reset}"
 }
 
+function log_info {
+  echo "${text_bold}${text_green}${1}${text_reset}"
+}
+
 function use_prebuilt {
   if [[ ! -z "${!PREBUILT_ENV_VAR_NAME:-}" ]]; then
     return 0
@@ -91,8 +95,8 @@ function compute_coverage {
 
     "$replayer" "$f" >/dev/null 2>&1 || true
 
-    count=$(expr $count + 1)
-    rem=$(expr $count % $step)
+    count=$((count + 1))
+    rem=$((count % step))
     if [ "$rem" != "0" ]; then continue; fi
     cov_data=$(gcovr -r . -s | grep "[lb][a-z]*:")
     l_per=$(echo "$cov_data" | grep lines | cut -d" " -f2 | rev | cut -c2- | rev)

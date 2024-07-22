@@ -43,7 +43,7 @@ RUN apt update && apt install -y \
     gdb \
     graphviz-dev libcap-dev libpcap-dev tcpdump \
     iputils-ping telnet net-tools \
-    strace zsh autojump \
+    strace zsh autojump fzf \
     && rm -rf /var/lib/apt/lists
 
 RUN pip3 install -i https://mirrors.aliyun.com/pypi/simple gcovr
@@ -67,7 +67,7 @@ RUN echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" > /etc/apt/apt.conf.d/99proxy
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 RUN groupadd -g ${GROUP_ID} ubuntu && \
-    useradd -u ${USER_ID} -rm -d /home/ubuntu -s /bin/bash -g ubuntu -G sudo ubuntu -p "$(openssl passwd -1 ubuntu)" && \
+    useradd -u ${USER_ID} -rm -d /home/ubuntu -s /usr/bin/zsh -g ubuntu -G sudo ubuntu -p "$(openssl passwd -1 ubuntu)" && \
     echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Use ubuntu as default username
@@ -174,7 +174,8 @@ ENV PATH="/home/ubuntu/pingu/target/debug:${PATH}"
 
 COPY . /home/ubuntu/profuzzbench
 
-RUN echo "abc12dd"
+RUN echo "abc12ddd"
 
 RUN sudo chown -R ubuntu:ubuntu /home/ubuntu/profuzzbench && \
-    sudo chmod +x /home/ubuntu/profuzzbench/scripts/*.sh
+    sudo chmod +x /home/ubuntu/profuzzbench/scripts/*.sh && \
+    cp /home/ubuntu/profuzzbench/scripts/.zshrc /home/ubuntu/

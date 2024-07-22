@@ -10,7 +10,7 @@ source scripts/utils.sh
 args=($(get_args_before_double_dash "$@"))
 fuzzer_args=$(get_args_after_double_dash "$@")
 
-opt_args=$(getopt -o o:f:t:v: -l output:,fuzzer:,target:,version:,times:,timeout: -- "${args[@]}")
+opt_args=$(getopt -o o:f:t:v: -l output:,fuzzer:,target:,version:,times:,timeout:,cleanup -- "${args[@]}")
 if [ $? != 0 ]; then
     log_error "[!] Error in parsing shell arguments."
     exit 1
@@ -43,6 +43,10 @@ while true; do
         timeout="$2"
         shift 2
         ;;
+    --cleanup)
+        cleanup=1
+        shift 1
+        ;;
     *)
         # echo "Usage: run.sh -t TARGET -f FUZZER -v VERSION [--times TIMES, --timeout TIMEOUT]"
         break
@@ -71,7 +75,7 @@ fi
 log_success "[+] Ready to launch image: $image_id"
 cids=()
 for i in $(seq 1 $times); do
-    # echo "docker run --name pingu-$fuzzer-$protocol-$impl-$i -d -it $image_name /bin/bash -c \"bash /home/ubuntu/profuzzbench/scripts/dispatch.sh subjects/$target run $fuzzer $timeout\""
+    echo "docker run --name pingu-$fuzzer-$protocol-$impl-$i -d -it $image_name /bin/bash -c \"bash /home/ubuntu/profuzzbench/scripts/dispatch.sh subjects/$target run $fuzzer $timeout\""
     id=$(docker run --name pingu-$fuzzer-$protocol-$impl-$i -d -it $image_name /bin/bash -c "bash /home/ubuntu/profuzzbench/scripts/dispatch.sh subjects/$target run $fuzzer $timeout")
     log_success "[+] Launch docker container: $i"
     cids+=(${id::12}) # store only the first 12 characters of a container ID
@@ -86,13 +90,12 @@ done
 log_success "[+] Fuzzing in progress ..."
 log_success "[+] Waiting for the following containers to stop: ${dlist}"
 docker wait ${dlist} >/dev/null
-wait
 
 index=1
 for id in ${cids[@]}; do
     log_success "[+] Pulling fuzzing results from ${id}"
     docker cp ${id}:/home/ubuntu/target/$fuzzer/output.tar.gz ${output}/out-${fuzzer}-${protocol}-${impl}-${impl_version}-${index}.tar.gz >/dev/null
-    if [ ! -z "$DELETE"]; then
+    if [ ! -z "$cleanup" ]; then
         docker rm ${id}
         log_success "[+] Container $id deleted"
     fi

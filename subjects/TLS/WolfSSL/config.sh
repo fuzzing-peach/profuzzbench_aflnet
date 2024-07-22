@@ -33,9 +33,9 @@ function replay {
 
 function run_aflnet {
     timeout=$1
-    outdir=$HOME/target/aflnet/output
-    indir=$HOME/profuzzbench/subjects/TLS/OpenSSL/in-tls
-    pushd $HOME/target/aflnet/wolfssl >/dev/null
+    outdir=${HOME}/target/aflnet/output
+    indir=${HOME}/profuzzbench/subjects/TLS/OpenSSL/in-tls
+    pushd ${HOME}/target/aflnet/wolfssl >/dev/null
 
     mkdir -p $outdir
     rm -rf $outdir/*
@@ -52,9 +52,9 @@ function run_aflnet {
         -P TLS -D 10000 -q 3 -s 3 -E -K -R -W 100 -m none \
         ./examples/server/server -c test.fullchain.pem -k test.key.pem -e -p 4433
 
-    list_cmd="ls -1 $outdir/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
+    list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
     pushd $HOME/target/gcov/wolfssl >/dev/null
-    compute_coverage replay "$list_cmd" 1 "$outdir"/coverage.csv
+    compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv
 
     gcovr -r . --html --html-details -o index.html
     mkdir $outdir/cov_html/
