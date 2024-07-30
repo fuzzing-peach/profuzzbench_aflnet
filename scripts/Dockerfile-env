@@ -124,5 +124,7 @@ ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain nightly-2024-02-14 && \
     . "$HOME/.cargo/env"
 
-RUN echo "asdf"
+    
+
+RUN echo "asdd"
 COPY . /home/ubuntu/profuzzbench
