@@ -1,46 +1,52 @@
-FROM ubuntu:22.04
+# FT-Net: https://github.com/fuzztruction/fuzztruction-net
+FROM nbars/fuzztruction-llvm_debug:llvmorg-17.0.6 as llvm
+
+# ubuntu:22.04 
+FROM ubuntu:23.04 as builder
 
 ARG HTTP_PROXY
 ARG HTTPS_PROXY
 
 ENV HTTP_PROXY=${HTTP_PROXY}
 ENV HTTPS_PROXY=${HTTPS_PROXY}
+ENV http_proxy=${HTTP_PROXY}
+ENV https_proxy=${HTTP_PROXY}
 
-# Change the Debian package mirror
+# Change the Ubuntu package mirror
 RUN apt update && apt install -y apt-transport-https ca-certificates
 RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.list && apt clean
 
-# LLVM-17
-RUN apt update && apt install -y --no-install-recommends wget gnupg2 && rm -rf /var/lib/apt/lists
-RUN echo deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main >> /etc/apt/sources.list
-RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+# # LLVM-17
+# RUN apt update && apt install -y --no-install-recommends wget gnupg2 && rm -rf /var/lib/apt/lists
+# RUN echo deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main >> /etc/apt/sources.list
+# RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 
 # Install common dependencies
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y \
-    apt-utils git build-essential curl libgnutls28-dev libssl-dev sudo libtool libtool-bin libglib2.0-dev bison flex automake libpixman-1-dev gcc-9-plugin-dev cgroup-tools \
-    libllvm-17-ocaml-dev libllvm17 llvm-17 llvm-17-dev llvm-17-doc llvm-17-examples llvm-17-runtime \
-    clang-17 clang-tools-17 clang-17-doc libclang-common-17-dev libclang-17-dev libclang1-17 clang-format-17 python3-clang-17 clangd-17 clang-tidy-17 \
-    libclang-rt-17-dev lldb-17 lld-17 libc++-17-dev libc++abi-17-dev \
-    rsync autopoint gperf autoconf texinfo gettext \
-    pkg-config libz-dev \
-    python3 python3-pip python3-dev python3-setuptools python-is-python3 \
-    openssh-server ncat netcat openssl \
-    vim nano screen htop man wget httpie bash-completion ripgrep \
-    gdb \
-    graphviz-dev libcap-dev libpcap-dev tcpdump \
-    iputils-ping telnet net-tools \
-    strace zsh autojump \
+RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/var/lib/apt \
+    apt update -y && yes | unminimize && apt-mark hold "llvm-*" && apt-mark hold "clang-*" && \
+    apt install -y \
+    apt-utils git build-essential curl libc++-dev sudo libtool libtool-bin libz-dev libglib2.0-dev graphviz-dev bison flex automake libpixman-1-dev cgroup-tools \
+    cmake bear autoconf pkg-config gdb strace \
+    openssh-server openssl libssl-dev libgnutls28-dev \
+    libcap-dev libpcap-dev tcpdump \
+    rsync autopoint gperf texinfo gettext \
+    python3 python3-pip python3-dev python3-setuptools python-is-python3 openjdk-11-jdk \
+    vim nano screen htop man wget httpie bash-completion ripgrep iputils-ping telnet net-tools ncat netcat-traditional \
+    zsh autojump fzf \
     && rm -rf /var/lib/apt/lists
 
-RUN pip3 install -i https://mirrors.aliyun.com/pypi/simple gcovr
+RUN pip3 install --break-system-packages -i https://mirrors.aliyun.com/pypi/simple gcovr
 
-RUN update-alternatives --install /usr/bin/clang clang $(which clang-17) 1 && \
-    update-alternatives --install /usr/bin/clang++ clang++ $(which clang++-17) 1 && \
-    update-alternatives --install /usr/bin/llvm-config llvm-config $(which llvm-config-17) 1 && \
-    update-alternatives --install /usr/bin/llvm-symbolizer llvm-symbolizer $(which llvm-symbolizer-17) 1 && \
-    update-alternatives --install /usr/bin/llvm-cov llvm-cov $(which llvm-cov-17) 1 && \
-    update-alternatives --install /usr/bin/llvm-profdata llvm-profdata $(which llvm-profdata-17) 1
+# Copy prebuilt custom LLVM version
+COPY --from=llvm /llvm/* /usr
+
+# RUN update-alternatives --install /usr/bin/clang clang $(which clang-17) 1 && \
+#     update-alternatives --install /usr/bin/clang++ clang++ $(which clang++-17) 1 && \
+#     update-alternatives --install /usr/bin/llvm-config llvm-config $(which llvm-config-17) 1 && \
+#     update-alternatives --install /usr/bin/llvm-symbolizer llvm-symbolizer $(which llvm-symbolizer-17) 1 && \
+#     update-alternatives --install /usr/bin/llvm-cov llvm-cov $(which llvm-cov-17) 1 && \
+#     update-alternatives --install /usr/bin/llvm-profdata llvm-profdata $(which llvm-profdata-17) 1
 
 RUN chmod 777 /tmp
 
@@ -50,81 +56,195 @@ RUN echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" > /etc/apt/apt.conf.d/99proxy
 
 # Users
 ##############
-# Add a new user ubuntu, pass: ubuntu
+# Add a new user
 ARG USER_ID=1000
 ARG GROUP_ID=1000
-RUN groupadd -g ${GROUP_ID} ubuntu && \
-    useradd -u ${USER_ID} -rm -d /home/ubuntu -s /bin/bash -g ubuntu -G sudo ubuntu -p "$(openssl passwd -1 ubuntu)" && \
-    echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+ENV USER_ID=${USER_ID}
+ENV GROUP_ID=${GROUP_ID}
 
-# Use ubuntu as default username
-USER ubuntu
-WORKDIR /home/ubuntu
+# ubuntu:23.04 has an 'ubuntu' user and group
+# so we use the 'user' as the default
+RUN groupadd -g ${GROUP_ID} user && \
+    useradd -u ${USER_ID} -rm -d /home/user -s /usr/bin/zsh -g user -G sudo user -p "$(openssl passwd -1 user)" && \
+    echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Use user as default username
+USER user
+WORKDIR /home/user
+ENV HOME=/home/user
 
 RUN git config --global http.version HTTP/1.1 
 
+# Rust
+ENV RUSTUP_DIST_SERVER=https://rsproxy.cn
+ENV RUSTUP_UPDATE_ROOT=https://rsproxy.cn/rustup
+RUN --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
+    --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain stable && \
+    printf "[source.crates-io]\nreplace-with = \"rsproxy-sparse\"\n\n[source.rsproxy-sparse]\nregistry = \"sparse+https://rsproxy.cn/index/\"" > "$HOME/.cargo/config.toml"
+COPY scripts/.zshrc ${HOME}/.zshrc
+COPY scripts/.p10k.zsh ${HOME}/.p10k.zsh
+RUN zsh -c ". ~/.zshrc"
 ##############
 # End of user setup
 
+# Code
+##############
+
 # Environments and fuzzer tools
 ##############
-ARG MAKE_OPT="-j"
+
+# Pingu: My Fuzzer :)
+FROM builder as pingu-builder
+ARG GITHUB_TOKEN
+RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
+    --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
+    git clone https://Kherrisan:$GITHUB_TOKEN@github.com/Kherrisan/pingu.git && \
+    cd pingu && \
+    echo "nightly-2024-02-14" >> rust-toolchain && \
+    git submodule update --init && \
+    cd fuzztruction && \
+    git submodule update --init && \
+    cd ../pingu-fuzzer && \
+    ${HOME}/.cargo/bin/cargo build
+# TODO: build pass and clang-fast
+# RUN cd pingu/fuzztruction/generator/pass && \
+
+# FT-Net
+FROM builder as ft-net-builder
+COPY patches /tmp/patches
+RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
+    --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
+    git clone https://github.com/fuzztruction/fuzztruction-net && \
+    cd fuzztruction-net && \
+    git apply /tmp/patches/ft.patch && \
+    echo "nightly-2023-10-10" >> rust-toolchain && \
+    ${HOME}/.cargo/bin/cargo build --workspace --release && \
+    git submodule update --init && \
+    cd consumer/aflpp-consumer && \ 
+    make clean && \ 
+    make all ${MAKE_OPT}
+# TODO: do we really need to build generator/pass manually? Or it is built alongside with cargo build?
+# RUN cd fuzztruction-net/generator/pass && \
+#     make ${MAKE_OPT}
+
+# TLS-Anvil
+# Change the maven mirror ?
+# de.rub.nds.* package may not be found in the aliyun maven registry.
+FROM builder as tlsanvil-builder
+RUN sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y maven
+RUN --mount=type=cache,target=${HOME}/.git,uid=${USER_ID},gid=${GROUP_ID} \
+    --mount=type=cache,target=${HOME}/.m2,uid=${USER_ID},gid=${GROUP_ID} \
+    git clone https://gitee.com/kherrisan/TLS-Anvil.git && \
+    cd TLS-Anvil && \
+    git checkout v1.2.9 && \
+    mvn install -DskipTests -Dspotless.apply.skip
+
+# build the final image
+FROM builder
+
 COPY patches /tmp/patches
 
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTPS_PROXY}
+ENV http_proxy=${HTTP_PROXY}
+ENV https_proxy=${HTTP_PROXY}
+
 # AFLNet
-RUN git clone https://github.com/aflnet/aflnet.git && \
+RUN git clone https://gitee.com/skyworld123/aflnet.git && \
     cd aflnet && \
     git checkout 62d63a59230bb5f5c6e54cddd381b9425dba3726 && \
     git apply /tmp/patches/aflnet.patch && \
-    make clean all $MAKE_OPT && \
-    cd llvm_mode && make $MAKE_OPT
+    make clean all ${MAKE_OPT} && \
+    cd llvm_mode && make ${MAKE_OPT}
 
-# # StateAFL
-# # ENV STATEAFL_CFLAGS="-DENABLE_TRACE_GLOBAL_DATA -DBLACKLIST_ALLOC_SITES -DBLACKLIST_GLOBALS"
-
-RUN sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y tshark && sudo pip3 install -i https://mirrors.aliyun.com/pypi/simple pyshark
-# TODO: error: corrupt patch at line 835
-RUN git clone https://github.com/stateafl/stateafl.git --depth=1 && \
+# StateAFL
+# ENV STATEAFL_CFLAGS="-DENABLE_TRACE_GLOBAL_DATA -DBLACKLIST_ALLOC_SITES -DBLACKLIST_GLOBALS"
+RUN sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y tshark && sudo pip3 install --break-system-packages -i https://mirrors.aliyun.com/pypi/simple pyshark
+RUN git clone https://gitee.com/zhangadiu/stateafl.git --depth=1 && \
     cd stateafl && \
     git checkout d923e22f7b2688db45b08f3fa3a29a566e7ff3a4 && \
     git submodule init && \
     git submodule update && \
-    git apply /tmp/patches/stateafl.patch
+    git apply /tmp/patches/stateafl.patch && \
+    make ${MAKE_OPT} && \
+    rm as && \
+    cd llvm_mode  && \
+    rm -f libmvptree.a containers.a libtlsh.a && \
+    cd tlsh && \
+    git apply /tmp/patches/tlsh.patch && \
+    cd .. && \
+    make ${MAKE_OPT}
 
 # SGFuzz
-RUN git clone https://github.com/bajinsheng/SGFuzz.git --depth=1 && \
+RUN git clone https://gitee.com/pine404/SGFuzz.git --depth=1 && \
     cd SGFuzz && \
     git checkout 00dbbd70ba79f1bcff3f7dfdb4fda0645cf91225 && \
     git apply /tmp/patches/sgfuzz.patch && \
     ./build.sh && \
     sudo cp libsfuzzer.a /usr/lib/libsFuzzer.a
 
-# # Install hongfuzz netdrive that is used by SGFuzz
-RUN git clone https://github.com/google/honggfuzz.git --depth=1 && \
+# Install hongfuzz netdrive that is used by SGFuzz
+RUN git clone https://gitee.com/kherrisan/honggfuzz.git --depth=1 && \
     cd honggfuzz && \
     CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address" make libhfcommon/libhfcommon.a && \
     CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address -DHFND_RECVTIME=1" make libhfnetdriver/libhfnetdriver.a && \
     sudo mv libhfcommon/libhfcommon.a /usr/lib/libhfcommon.a && \
     sudo mv libhfnetdriver/libhfnetdriver.a /usr/lib/libhfnetdriver.a
 
-# # TLS-Anvil
-# # TODO: change the maven mirror ?
-RUN sudo apt install -y openjdk-11-jdk maven
-RUN git clone https://github.com/tls-attacker/TLS-Anvil.git --depth=1 && \
-    cd TLS-Anvil && \
-    mvn install -DskipTests -Dspotless.apply.skip
-
-# # tlsfuzzer
-RUN pip3 install -i https://mirrors.aliyun.com/pypi/simple --pre tlslite-ng && \
+# tlsfuzzer
+RUN pip3 install --break-system-packages -i https://mirrors.aliyun.com/pypi/simple --pre tlslite-ng && \
     git clone https://github.com/tlsfuzzer/tlsfuzzer.git --depth=1
 
-# Rust
-ENV RUSTUP_DIST_SERVER=https://mirrors.ustc.edu.cn/rust-static \
-    RUSTUP_UPDATE_ROOT=https://mirrors.ustc.edu.cn/rust-static/rustup
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain nightly-2024-02-14 && \
-    . "$HOME/.cargo/env"
+RUN cd /tmp && \
+    git clone https://github.com/NixOS/patchelf.git && \
+    cd patchelf && \
+    ./bootstrap.sh && \
+    ./configure && \
+    make && \
+    make check && \
+    sudo make install
 
-    
+# TODO:
+# DY fuzzer
 
-RUN echo "asdd"
-COPY . /home/ubuntu/profuzzbench
+# Install rr
+RUN cd /tmp && \
+    wget https://github.com/rr-debugger/rr/releases/download/5.7.0/rr-5.7.0-Linux-$(uname -m).deb && \
+    sudo dpkg -i rr-5.7.0-Linux-$(uname -m).deb
+
+# Copy FT-Net artifact
+RUN mkdir -p ${HOME}/fuzztruction/target/release/ && \
+    mkdir -p ${HOME}/fuzztruction/target/debug/ && \
+    mkdir -p ${HOME}/fuzztruction/generator/pass/ && \
+    mkdir -p ${HOME}/fuzztruction/consumer/aflpp-consumer
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/consumer/aflpp-consumer ${HOME}/fuzztruction/consumer/aflpp-consumer
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/fuzztruction ${HOME}/fuzztruction/target/release/fuzztruction
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.a ${HOME}/fuzztruction/target/release/libgenerator_agent.a
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so ${HOME}/fuzztruction/target/release/libgenerator_agent.so
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so ${HOME}/fuzztruction/target/debug/libgenerator_agent.so
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast ${HOME}/fuzztruction/generator/pass/fuzztruction-source-clang-fast
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast++ ${HOME}/fuzztruction/generator/pass/fuzztruction-source-clang-fast++
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-llvm-pass.so ${HOME}/fuzztruction/generator/pass/fuzztruction-source-llvm-pass.so
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/mem_functions.ll ${HOME}/fuzztruction/generator/pass/mem_functions.ll
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/data/ld_fuzztruction.conf /etc/ld.so.conf.d/fuzztruction.conf
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/env/check_env.sh /usr/bin/
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/fuzztruction-experiments ${HOME}/fuzztruction/fuzztruction-experiments
+
+# Copy pingu artifact
+RUN mkdir -p ${HOME}/fpingu/target/debug/
+COPY --from=pingu-builder ${HOME}/pingu/target/debug/pingu ${HOME}/pingu/target/debug/pingu
+COPY --from=pingu-builder ${HOME}/pingu/target/debug/libfake_random.so ${HOME}/pingu/target/debug/libfake_random.so
+# TODO: copy artifact in the directory generator/pass
+RUN sudo touch "/etc/ld.so.conf.d/pingu.conf" && \
+    echo "${HOME}/pingu/target/debug" | sudo tee "/etc/ld.so.conf.d/pingu.conf" && \
+    sudo ldconfig
+
+# Copy TLS-Anvil artifact
+RUN mkdir -p ${HOME}/TLS-Anvil/TLS-Testsuite/
+COPY --from=tlsanvil-builder ${HOME}/TLS-Anvil/TLS-Testsuite/apps ${HOME}/TLS-Anvil/TLS-Testsuite/apps
+
+COPY . ${HOME}/profuzzbench
+
+RUN sudo chown -R user:user ${HOME}/profuzzbench && \
+    sudo chmod +x ${HOME}/profuzzbench/scripts/*.sh 

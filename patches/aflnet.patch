@@ -1,7 +1,21 @@
 diff --git a/afl-fuzz.c b/afl-fuzz.c
-index 3b0ed0a..4871d68 100644
+index 3b0ed0a..1279383 100644
 --- a/afl-fuzz.c
 +++ b/afl-fuzz.c
+@@ -2929,11 +2929,11 @@ EXP_ST void init_forkserver(char** argv) {
+ 
+     if (out_file) {
+ 
+-      dup2(dev_null_fd, 0);
++      //dup2(dev_null_fd, 0);
+ 
+     } else {
+ 
+-      dup2(out_fd, 0);
++      //dup2(out_fd, 0);
+       close(out_fd);
+ 
+     }
 @@ -3861,7 +3861,7 @@ static void pivot_inputs(void) {
        u8* use_name = strstr(rsl, ",orig:");
  

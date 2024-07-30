@@ -1,7 +1,18 @@
 FROM ubuntu:20.04
 
-# Install common dependencies
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTPS_PROXY}
+ENV http_proxy=${HTTP_PROXY}
+ENV https_proxy=${HTTP_PROXY}
 ENV DEBIAN_FRONTEND=noninteractive
+RUN apt update && apt install -y apt-transport-https ca-certificates
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.list && apt clean
+
+# Install common dependencies
+
 RUN apt-get -y update && \
     apt-get -y install sudo \ 
     apt-utils \
@@ -36,16 +47,11 @@ USER ubuntu
 WORKDIR /home/ubuntu
 
 # Import environment variable to pass as parameter to make (e.g., to make parallel builds with -j)
-ARG MAKE_OPT
+ARG MAKE_OPT="-j"
 
 # Set up fuzzers
 RUN git clone https://github.com/profuzzbench/aflnet.git && \
     cd aflnet && \
-    make clean all $MAKE_OPT && \
-    cd llvm_mode && make $MAKE_OPT
-
-RUN git clone https://github.com/profuzzbench/aflnwe.git && \
-    cd aflnwe && \
     make clean all $MAKE_OPT && \
     cd llvm_mode && make $MAKE_OPT
 
@@ -70,7 +76,7 @@ env ASAN_OPTIONS='abort_on_error=1:symbolize=0:detect_leaks=0:detect_stack_use_a
 
 # Download and compile OpenSSL for fuzzing
 RUN cd ${WORKDIR} && \
-    git clone https://github.com/openssl/openssl.git && \
+    git clone https://gitee.com/sz_abundance/openssl.git && \
     cd openssl && \
     cp ${WORKDIR}/*.pem ./ && \
     git checkout 0437435a && \
@@ -82,7 +88,7 @@ RUN cd ${WORKDIR} && \
 
 # Download and compile OpenSSL for coverage analysis
 RUN cd ${WORKDIR} && \
-    git clone https://github.com/openssl/openssl.git openssl-gcov && \
+    git clone https://gitee.com/sz_abundance/openssl.git openssl-gcov && \
     cd openssl-gcov && \
     cp ${WORKDIR}/*.pem ./ && \
     git checkout 0437435a && \
