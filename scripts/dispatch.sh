@@ -8,23 +8,10 @@ source scripts/utils.sh
 
 function in_subshell() {
     (
+        cd "$HOME"
         echo "[+] Running in subshell: $@"
         $@
     )
-}
-
-function check_config_exported_functions() {
-    local failed=0
-    for fn_name in "install_dependencies build_pingu build_aflnet build_stateafl build_sgfuzz build_gcov build_vanilla"; do
-        if ! type $fn_name > /dev/null; then
-            echo "[!] Target config does not define function $fn_name"
-            failed=1
-        fi
-    done
-    if [[ $failed -ne 0 ]]; then
-        echo "[!] Config check failed! Please fix your config."
-        exit 1
-    fi
 }
 
 if [[ $# -lt 1 ]]; then
@@ -33,63 +20,90 @@ if [[ $# -lt 1 ]]; then
     exit 1
 fi
 
-path=$1
-if [[ ! -d "$path" ]]; then
-    echo "[!] Invalid directory: $path"
+target=$1
+if [[ ! -d "subjects/${target}" ]]; then
+    echo "[!] Invalid target: $target"
     exit 1
 fi
 
-cfg_path="$path/config.sh"
-if [[ ! -f "$cfg_path" ]]; then
-    echo "[!] Config could not be found at: $cfg_path"
+target_config="subjects/$target/config.sh"
+if [[ ! -f "$target_config" ]]; then
+    echo "[!] Config could not be found at: $target_config"
     exit 1
 fi
 
-source $cfg_path
-check_config_exported_functions
-
-cd $HOME
 cmd=${2-"build"}
+# cmd is checkout
+case $cmd in
+    checkout)
+        source $target_config
+        shift 2
+        in_subshell checkout "$@"
+        exit 0
+    ;;
+    *)
+    ;;
+esac
+
+# cmd is build/run
 mode=${3-"all"}
 shift 3
 case $mode in
     deps)
+        source $target_config
         in_subshell install_dependencies "$@"
     ;;
     pingu)
         # Pingu is the name of my fuzzer :)
+        source $target_config
         in_subshell "$cmd"_pingu "$@"
     ;;
+    ft)
+        # FT-Net: https://github.com/fuzztruction/fuzztruction-net
+        # scripts/dispatch.sh subjects/${TARGET} build ft ${GENERATOR}
+        # when ${GENERATOR} is not specified, it is treated the same as ${TARGET}
+        # ${GENERATOR} is the path like TLS/OpenSSL
+        (
+            # build consumer
+            source $target_config
+            # ignore the ${GENERATOR}
+            in_subshell "$cmd"_ft_consumer "${@:2}"
+        )
+        (
+            # build generator
+            generator=${1-$target}
+            source "subjects/$generator/config.sh"
+            in_subshell "$cmd"_ft_generator "${@:2}"
+        )
+    ;;
     aflnet)
+        source $target_config
         in_subshell "$cmd"_aflnet "$@"
     ;;
     stateafl)
         # StateAFL: https://github.com/stateafl/stateafl
+        source $target_config
         in_subshell "$cmd"_stateafl "$@"
     ;;
     sgfuzz)
         # SGFuzz: https://github.com/bajinsheng/SGFuzz
         # The configuration steps could also be referenced by https://github.com/fuzztruction/fuzztruction-net/blob/main/Dockerfile
+        source $target_config
         in_subshell "$cmd"_sgfuzz "$@"
     ;;
     vanilla)
         # Build vanilla version
         # Vanilla means the true original version, without any instrumentation, hooking and analysis.
+        source $target_config
         in_subshell build_vanilla "$@"
     ;;
     gcov)
         # Build the gcov version, which is used to be computed coverage upon.
+        source $target_config
         in_subshell build_gcov "$@"
     ;;
     all)
-        in_subshell get_source || true
-        in_subshell install_dependencies || true
-        in_subshell build_pingu || true
-        in_subshell build_aflnet || true
-        in_subshell build_stateafl || true
-        in_subshell build_sgfuzz || true
-        in_subshell build_gcov || true
-        in_subshell build_vanilla || true
+        echo "[!] Not implemented for 'all'"
     ;;
     *)
         echo "[!] Invalid mode $mode"

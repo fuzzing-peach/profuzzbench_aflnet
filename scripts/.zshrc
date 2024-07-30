@@ -1,6 +1,8 @@
 function setup_proxy {
     export http_proxy=$1
     export https_proxy=$1
+    export HTTP_PROXY=$1
+    export HTTPS_PROXY=$1
 
     git config --global http.proxy $1
     git config --global https.proxy $1
@@ -10,6 +12,8 @@ function setup_proxy {
 HISTFILE=~/.histfile
 HISTSIZE=1000
 SAVEHIST=1000
+
+# vi mode
 bindkey -v
 # End of lines configured by zsh-newuser-install
 # The following lines were added by compinstall
@@ -61,20 +65,24 @@ zinit light zsh-users/zsh-history-substring-search
 
 zinit light Aloxaf/fzf-tab
 
+# zsh-vi-mode
+zinit ice depth=1
+zinit light jeffreytse/zsh-vi-mode
+
 # zsh-fzf-history-search
 zinit ice lucid wait'0'
 zinit light joshskidmore/zsh-fzf-history-search
 
-# zsh completetions for cargo
-zinit ice lucid nocompile
-zinit load MenkeTechnologies/zsh-cargo-completion
+# # zsh completetions for cargo
+# zinit ice lucid nocompile
+# zinit load MenkeTechnologies/zsh-cargo-completion
 
 # you-should-use
 zinit ice wait lucid depth=1; zinit light MichaelAquilina/zsh-you-should-use
 export YSU_MESSAGE_POSITION="after"
 
-zinit ice as"completion"
-zinit snippet https://github.com/watchexec/cargo-watch/tree/8.x/completions/zsh
+# zinit ice as"completion"
+# zinit snippet https://github.com/watchexec/cargo-watch/tree/8.x/completions/zsh
 
 # oh-my-zsh libs
 zi light-mode lucid for \
@@ -104,14 +112,4 @@ zi light-mode wait lucid for \
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
-export CARGO_HOME=/home/ubuntu/.cargo
-# export CMAKE_HOME=/home/ubuntu/cmake-3.29.3-linux-x86_64
-export RUSTUP_HOME=/home/ubuntu/.rustup
-
-export PATH=$CARGO_HOME/bin:$PATH
-export PATH=$PATH:/home/ubuntu/pingu/target/debug
-
-alias cb="cargo build"
-
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+export PATH=$PATH:/home/user/pingu/target/debug

@@ -2,6 +2,14 @@
 
 set -e
 
+function checkout {
+    mkdir -p repo
+    git clone https://gitee.com/zzroot/wolfssl.git repo/wolfssl
+    pushd repo/wolfssl > /dev/null
+    git checkout "$@"
+    popd > /dev/null
+}
+
 function build_aflnet {
     mkdir -p target/aflnet
     rm -rf target/aflnet/*

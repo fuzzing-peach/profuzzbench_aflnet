@@ -1,0 +1,30 @@
+diff --git a/generator/pass/fuzztruction-source-llvm-pass.cc b/generator/pass/fuzztruction-source-llvm-pass.cc
+index 67ea691..1322283 100644
+--- a/generator/pass/fuzztruction-source-llvm-pass.cc
++++ b/generator/pass/fuzztruction-source-llvm-pass.cc
+@@ -766,6 +766,9 @@ bool FuzztructionSourcePass::injectPatchPoints(Module &M) {
+     auto allowlisted_functions = parse_env_var_list("FT_FUNCTION_ALLOWLIST");
+     dbgs() << "allowlisted_functions: " << allowlisted_functions.size() << "\n";
+ 
++    auto blocklisted_functions = parse_env_var_list("FT_FUNCTION_BLOCKLIST");
++    dbgs() << "blocklisted_functions: " << blocklisted_functions.size() << "\n";
++
+     auto allowlisted_files = parse_env_var_list("FT_FILE_ALLOWLIST");
+     dbgs() << "allowlisted_files: " << allowlisted_files.size() << "\n";
+ 
+@@ -786,11 +789,11 @@ bool FuzztructionSourcePass::injectPatchPoints(Module &M) {
+         }
+     }
+ 
+-    auto allowlisted_files = parse_env_var_list("FT_FILE_ALLOWLIST");
+-    dbgs() << "allowlisted_files: " << allowlisted_files.size() << "\n";
++    //auto allowlisted_files = parse_env_var_list("FT_FILE_ALLOWLIST");
++    //dbgs() << "allowlisted_files: " << allowlisted_files.size() << "\n";
+ 
+-    auto blocklisted_files = parse_env_var_list("FT_FILE_BLOCKLIST");
+-    dbgs() << "blocklisted_files: " << blocklisted_files.size() << "\n";
++    //auto blocklisted_files = parse_env_var_list("FT_FILE_BLOCKLIST");
++    //dbgs() << "blocklisted_files: " << blocklisted_files.size() << "\n";
+ 
+     if (allowlisted_files.size() > 0) {
+         if (std::find(allowlisted_files.begin(), allowlisted_files.end(), M.getSourceFileName()) != allowlisted_files.end()) {

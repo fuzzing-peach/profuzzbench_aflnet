@@ -75,8 +75,8 @@ fi
 log_success "[+] Ready to launch image: $image_id"
 cids=()
 for i in $(seq 1 $times); do
-    echo "docker run --name pingu-$fuzzer-$protocol-$impl-$i -d -it $image_name /bin/bash -c \"bash /home/ubuntu/profuzzbench/scripts/dispatch.sh subjects/$target run $fuzzer $timeout\""
-    id=$(docker run --name pingu-$fuzzer-$protocol-$impl-$i -d -it $image_name /bin/bash -c "bash /home/ubuntu/profuzzbench/scripts/dispatch.sh subjects/$target run $fuzzer $timeout")
+    echo "docker run --name pingu-$fuzzer-$protocol-$impl-$i -d -it $image_name /bin/bash -c \"bash /home/user/profuzzbench/scripts/dispatch.sh $target run $fuzzer $timeout\""
+    id=$(docker run --name pingu-$fuzzer-$protocol-$impl-$i -d -it $image_name /bin/bash -c "bash /home/user/profuzzbench/scripts/dispatch.sh $target run $fuzzer $timeout")
     log_success "[+] Launch docker container: $i"
     cids+=(${id::12}) # store only the first 12 characters of a container ID
 done
@@ -94,9 +94,10 @@ docker wait ${dlist} >/dev/null
 index=1
 for id in ${cids[@]}; do
     log_success "[+] Pulling fuzzing results from ${id}"
-    docker cp ${id}:/home/ubuntu/target/$fuzzer/output.tar.gz ${output}/out-${fuzzer}-${protocol}-${impl}-${impl_version}-${index}.tar.gz >/dev/null
+    ts=$(date +%s)
+    docker cp ${id}:${HOME}/target/$fuzzer/output.tar.gz ${output}/out-${fuzzer}-${protocol}-${impl}-${impl_version}-${index}-${ts}.tar.gz >/dev/null
     if [ ! -z "$cleanup" ]; then
-        docker rm ${id}
+        docker rm ${id} >/dev/null
         log_success "[+] Container $id deleted"
     fi
     index=$((index+1))
