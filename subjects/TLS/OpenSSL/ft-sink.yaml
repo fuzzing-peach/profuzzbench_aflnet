@@ -1,0 +1,24 @@
+sink:
+  bin-path: "/home/user/target/ft/consumer/openssl/apps/openssl"
+  env:
+    - LD_LIBRARY_PATH: "/home/user/target/ft/consumer/openssl"
+  arguments:
+    [
+      "s_server",
+      "-key",
+      "/home/user/profuzzbench/test.key.pem",
+      "-cert",
+      "/home/user/profuzzbench/test.fullchain.pem",
+      "-accept",
+      "4433",
+      "-www",
+      "-naccept",
+      "1",
+    ]
+  input-type: Tcp
+  output-type: Tcp
+  is-server: true
+  server-port: "4433"
+  log-stdout: false
+  log-stderr: true
+  allow-unstable-sink: true

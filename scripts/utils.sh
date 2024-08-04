@@ -91,14 +91,16 @@ function compute_coverage {
   # process other testcases
   count=0
   for f in $testcases; do
+    echo $f
     time=$(stat -c %Y $f)
 
-    "$replayer" "$f" >/dev/null 2>&1 || true
+    "$replayer" "$f" || true
 
     count=$((count + 1))
     rem=$((count % step))
     if [ "$rem" != "0" ]; then continue; fi
     cov_data=$(gcovr -r . -s | grep "[lb][a-z]*:")
+    echo $cov_data
     l_per=$(echo "$cov_data" | grep lines | cut -d" " -f2 | rev | cut -c2- | rev)
     l_abs=$(echo "$cov_data" | grep lines | cut -d" " -f3 | cut -c2-)
     b_per=$(echo "$cov_data" | grep branch | cut -d" " -f2 | rev | cut -c2- | rev)
@@ -118,4 +120,44 @@ function compute_coverage {
 
     echo "$time,$l_per,$l_abs,$b_per,$b_abs" >>$covfile
   fi
+}
+
+sleep_ms_perl() {
+    local ms=$1
+    perl -e "select(undef, undef, undef, $ms/1000)"
+}
+
+check_port_listening() {
+    local port="$1"
+    local timeout="${2:-3}"  # default timeout is 3s
+    local interval="${3:-1}"  # default check interval is 1ms
+
+    local start_time=$(date +%s)
+
+    while true; do
+        if command -v ss &> /dev/null; then
+            if ss -tln | grep -q ":$port "; then
+                echo "Port $port is now listening"
+                return 0
+            fi
+        elif command -v netstat &> /dev/null; then
+            if netstat -tln | grep -q ":$port "; then
+                echo "Port $port is now listening"
+                return 0
+            fi
+        else
+            echo "Error: Neither 'ss' nor 'netstat' command found" >&2
+            return 2
+        fi
+
+        local current_time=$(date +%s)
+        local elapsed=$((current_time - start_time))
+
+        if [ $elapsed -ge $timeout ]; then
+            echo "Timeout reached. Port $port is not listening" >&2
+            return 1
+        fi
+
+        sleep_ms_perl $interval
+    done
 }

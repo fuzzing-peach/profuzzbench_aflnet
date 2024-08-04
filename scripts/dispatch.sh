@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
-set -o pipefail
 cd $(dirname $0)
 cd ..
 source scripts/utils.sh
@@ -35,78 +33,88 @@ fi
 cmd=${2-"build"}
 # cmd is checkout
 case $cmd in
-    checkout)
-        source $target_config
-        shift 2
-        in_subshell checkout "$@"
-        exit 0
+checkout)
+    source $target_config
+    shift 2
+    in_subshell checkout "$@"
+    exit 0
     ;;
-    *)
-    ;;
+*) ;;
 esac
 
 # cmd is build/run
 mode=${3-"all"}
 shift 3
 case $mode in
-    deps)
-        source $target_config
-        in_subshell install_dependencies "$@"
+deps)
+    source $target_config
+    in_subshell install_dependencies "$@"
     ;;
-    pingu)
-        # Pingu is the name of my fuzzer :)
-        source $target_config
-        in_subshell "$cmd"_pingu "$@"
+pingu)
+    # Pingu is the name of my fuzzer :)
+    source $target_config
+    in_subshell "$cmd"_pingu "$@"
     ;;
-    ft)
-        # FT-Net: https://github.com/fuzztruction/fuzztruction-net
-        # scripts/dispatch.sh subjects/${TARGET} build ft ${GENERATOR}
-        # when ${GENERATOR} is not specified, it is treated the same as ${TARGET}
-        # ${GENERATOR} is the path like TLS/OpenSSL
+ft)
+    # FT-Net: https://github.com/fuzztruction/fuzztruction-net
+    # args: scripts/dispatch.sh ${TARGET} build ft ${GENERATOR}
+    # when ${GENERATOR} is not specified, it is treated the same as ${TARGET}
+    # ${GENERATOR} is the implmentation name like OpenSSL
+    if [[ "$cmd" == "build" ]]; then
         (
             # build consumer
             source $target_config
             # ignore the ${GENERATOR}
-            in_subshell "$cmd"_ft_consumer "${@:2}"
+            in_subshell build_ft_consumer "${@:2}"
         )
         (
             # build generator
-            generator=${1-$target}
+            if [[ -n $1 ]]; then
+                generator=${target%/*}/$1
+            else
+                generator=${target}
+            fi
             source "subjects/$generator/config.sh"
-            in_subshell "$cmd"_ft_generator "${@:2}"
+            in_subshell build_ft_generator "${@:2}"
         )
-    ;;
-    aflnet)
+    else
+        # run generator-consumer
         source $target_config
-        in_subshell "$cmd"_aflnet "$@"
+        # run_ft $timeout $generator
+        in_subshell run_ft "$@"
+    fi
     ;;
-    stateafl)
-        # StateAFL: https://github.com/stateafl/stateafl
-        source $target_config
-        in_subshell "$cmd"_stateafl "$@"
+aflnet)
+    source $target_config
+    in_subshell "$cmd"_aflnet "$@"
     ;;
-    sgfuzz)
-        # SGFuzz: https://github.com/bajinsheng/SGFuzz
-        # The configuration steps could also be referenced by https://github.com/fuzztruction/fuzztruction-net/blob/main/Dockerfile
-        source $target_config
-        in_subshell "$cmd"_sgfuzz "$@"
+stateafl)
+    # StateAFL: https://github.com/stateafl/stateafl
+    source $target_config
+    in_subshell "$cmd"_stateafl "$@"
     ;;
-    vanilla)
-        # Build vanilla version
-        # Vanilla means the true original version, without any instrumentation, hooking and analysis.
-        source $target_config
-        in_subshell build_vanilla "$@"
+sgfuzz)
+    # SGFuzz: https://github.com/bajinsheng/SGFuzz
+    # The configuration steps could also be referenced by https://github.com/fuzztruction/fuzztruction-net/blob/main/Dockerfile
+    source $target_config
+    in_subshell "$cmd"_sgfuzz "$@"
     ;;
-    gcov)
-        # Build the gcov version, which is used to be computed coverage upon.
-        source $target_config
-        in_subshell build_gcov "$@"
+vanilla)
+    # Build vanilla version
+    # Vanilla means the true original version, without any instrumentation, hooking and analysis.
+    source $target_config
+    in_subshell build_vanilla "$@"
     ;;
-    all)
-        echo "[!] Not implemented for 'all'"
+gcov)
+    # Build the gcov version, which is used to be computed coverage upon.
+    source $target_config
+    in_subshell build_gcov "$@"
     ;;
-    *)
-        echo "[!] Invalid mode $mode"
-        exit 1
+all)
+    echo "[!] Not implemented for 'all'"
+    ;;
+*)
+    echo "[!] Invalid mode $mode"
+    exit 1
     ;;
 esac

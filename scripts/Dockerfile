@@ -1,7 +1,7 @@
 FROM pingu-env:latest
 
 USER user
-WORKDIR /home/user/profuzzbench
+ENV HOME=/home/user
 
 ARG FUZZER
 ARG TARGET
@@ -13,9 +13,10 @@ ENV VERSION=${VERSION}
 ENV ARGS=${ARGS}
 ENV TERM=xterm
 
-RUN pwd
-RUN scripts/dispatch.sh ${TARGET} checkout ${VERSION}
-RUN scripts/dispatch.sh ${TARGET} build deps
-RUN scripts/dispatch.sh ${TARGET} build vanilla
-RUN scripts/dispatch.sh ${TARGET} build gcov
-RUN scripts/dispatch.sh ${TARGET} build ${FUZZER} ${ARGS}
+# RUN pwd
+RUN --mount=type=bind,source=.,target=/home/user/profuzzbench\
+    bash ${HOME}/profuzzbench/scripts/dispatch.sh ${TARGET} checkout ${VERSION} && \
+    bash ${HOME}/profuzzbench/scripts/dispatch.sh ${TARGET} build deps && \
+    bash ${HOME}/profuzzbench/scripts/dispatch.sh ${TARGET} build gcov && \
+    bash ${HOME}/profuzzbench/scripts/dispatch.sh ${TARGET} build ${FUZZER} ${ARGS}
+# RUN scripts/dispatch.sh ${TARGET} build vanilla

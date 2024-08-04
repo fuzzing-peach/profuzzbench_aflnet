@@ -5,18 +5,21 @@ set -eu
 function checkout {
     mkdir -p repo
     git clone https://gitee.com/sz_abundance/openssl.git repo/openssl
-    pushd repo/openssl > /dev/null
+    pushd repo/openssl >/dev/null
     git checkout "$@"
     git apply ${HOME}/fuzztruction/fuzztruction-experiments/comparison-with-state-of-the-art/binaries/networked/openssl/fuzzing.patch
-    popd > /dev/null
+    popd >/dev/null
 }
 
 function replay {
-    timeout -k 0 3s ./apps/openssl s_server \
+    # the process launching order is confusing...
+    ${HOME}/aflnet/aflnet-replay $1 TLS 4433 100 &
+    LD_PRELOAD=libgcov_preload.so:libfake_random.so FAKE_RANDOM=1 \
+        timeout -k 1s 3s ./apps/openssl s_server \
         -cert ${HOME}/profuzzbench/test.fullchain.pem \
         -key ${HOME}/profuzzbench/test.key.pem \
-        -accept 4433 >/dev/null 2>&1 &
-    ${HOME}/aflnet/aflnet-replay $1 TLS 4433 100 >/dev/null 2>&1
+        -accept 4433
+    wait
 }
 
 function install_dependencies {
@@ -27,7 +30,7 @@ function build_aflnet {
     mkdir -p target/aflnet
     rm -rf target/aflnet/*
     cp -r repo/openssl target/aflnet/openssl
-    pushd target/aflnet/openssl > /dev/null
+    pushd target/aflnet/openssl >/dev/null
 
     export CC=${HOME}/aflnet/afl-clang-fast
     export CXX=${HOME}/aflnet/afl-clang-fast++
@@ -44,7 +47,7 @@ function build_aflnet {
     rm -rf test
     rm -rf .git
 
-    popd > /dev/null
+    popd >/dev/null
 }
 
 function run_aflnet {
@@ -67,7 +70,7 @@ function run_aflnet {
         ./apps/openssl s_server \
         -cert ${HOME}/profuzzbench/test.fullchain.pem \
         -key ${HOME}/profuzzbench/test.key.pem \
-        -accept 4433 -debug
+        -accept 4433
 
     list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
     pushd ${HOME}/target/gcov/openssl >/dev/null
@@ -88,7 +91,7 @@ function build_stateafl {
     mkdir -p target/stateafl
     rm -rf target/stateafl/*
     cp -r repo/openssl target/stateafl/openssl
-    pushd target/stateafl/openssl > /dev/null
+    pushd target/stateafl/openssl >/dev/null
 
     export AFL_SKIP_CPUFREQ=1
     export CC=${HOME}/stateafl/afl-clang-fast
@@ -103,7 +106,7 @@ function build_stateafl {
     rm -rf test
     rm -rf .git
 
-    popd > /dev/null
+    popd >/dev/null
 }
 
 function build_sgfuzz {
@@ -127,14 +130,14 @@ function build_ft_generator {
     export CFLAGS="-O3 -g -DNDEBUG -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_GENEARTOR"
     export CXXFLAGS="-O3 -DNDEBUG -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_GENEARTOR"
 
-    ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async enable-asan
+    ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async
     LDCMD=${HOME}/fuzztruction/generator/pass/fuzztruction-source-clang-fast bear -- make -j
 
     rm -rf fuzz
     rm -rf test
     rm -rf .git
 
-    popd > /dev/null
+    popd >/dev/null
 }
 
 function build_ft_consumer {
@@ -159,7 +162,38 @@ function build_ft_consumer {
     rm -rf test
     rm -rf .git
 
-    popd > /dev/null
+    popd >/dev/null
+}
+
+function run_ft {
+    timeout=$1
+    consumer="OpenSSL"
+    generator=${2-$consumer}
+    work_dir=/tmp/ft-${generator}-TLS-${consumer}-$(date +%s)
+    outdir=${HOME}/target/ft/output
+    indir=${HOME}/profuzzbench/no-inputs
+    pushd ${HOME}/target/ft/ >/dev/null
+    
+    # synthesize the ft configuration yaml
+    # according to the targeted fuzzer and generated
+    temp_file=$(mktemp)
+    sed -e "s|WORK-DIRECTORY|$work_dir|g" -e "s|UID|$(id -u)|g" -e "s|GID|$(id -g)|g" ${HOME}/profuzzbench/ft.yaml > "$temp_file"
+    cat "$temp_file" > ft.yaml
+    printf "\n" >> ft.yaml
+    rm "$temp_file"
+    cat ${HOME}/profuzzbench/subjects/TLS/${generator}/ft-source.yaml >> ft.yaml
+    cat ${HOME}/profuzzbench/subjects/TLS/${consumer}/ft-sink.yaml >> ft.yaml
+
+    # running ft
+    sudo ${HOME}/fuzztruction/target/release/fuzztruction ft.yaml fuzz -t ${timeout}s
+
+    # collecting coverage
+
+    rm -rf fuzz
+    rm -rf test
+    rm -rf .git
+
+    popd >/dev/null
 }
 
 function build_gcov {
@@ -172,9 +206,13 @@ function build_gcov {
     export LDFLAGS="-fprofile-arcs -ftest-coverage"
 
     ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async
-    make -j
+    bear -- make -j
 
-    popd > /dev/null
+    rm -rf fuzz
+    rm -rf test
+    rm -rf .git
+
+    popd >/dev/null
 }
 
 function build_vanilla {
@@ -183,8 +221,8 @@ function build_vanilla {
     cp -r repo/openssl target/vanilla/openssl
     pushd target/vanilla/openssl >/dev/null
 
-    ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async 
+    ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async
     make -j
 
-    popd > /dev/null
+    popd >/dev/null
 }

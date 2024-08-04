@@ -10,7 +10,7 @@ source scripts/utils.sh
 args=($(get_args_before_double_dash "$@"))
 fuzzer_args=$(get_args_after_double_dash "$@")
 
-opt_args=$(getopt -o o:f:t:v: -l output:,fuzzer:,target:,version:,times:,timeout:,cleanup -- "${args[@]}")
+opt_args=$(getopt -o o:f:t:v: -l output:,fuzzer:,generator:,target:,version:,times:,timeout:,cleanup -- "${args[@]}")
 if [ $? != 0 ]; then
     log_error "[!] Error in parsing shell arguments."
     exit 1
@@ -25,6 +25,10 @@ while true; do
         ;;
     -f | --fuzzer)
         fuzzer="$2"
+        shift 2
+        ;;
+    --generator)
+        generator="$2"
         shift 2
         ;;
     -t | --target)
@@ -54,15 +58,22 @@ while true; do
     esac
 done
 
-# if [ ${#args[@]} -lt 4 ]; then
-#     log_error "[!] Insufficient arguments, require: <target> <fuzzer> <times> <timeout>"
-#     exit 1
-# fi
+if [[ -n "$generator" && "$fuzzer" != "ft" && "$fuzzer" != "pingu" ]]; then
+    log_error "[!] Argument --generator is only allowed when --fuzzer is ft or pingu"
+    exit 1
+fi
+
 times=${times:-"1"}
 protocol=${target%/*}
 impl=${target##*/}
-impl_version=${version:-latest}
-image_name=$(echo "pingu-$fuzzer-$protocol-$impl:$impl_version" | tr 'A-Z' 'a-z')
+# image_name=$(echo "pingu-$fuzzer-$protocol-$impl:$impl_version" | tr 'A-Z' 'a-z')
+if [[ -z "$generator" ]]; then
+    image_name=$(echo "pingu-${fuzzer}-${protocol}-${impl}:${version:-latest}" | tr 'A-Z' 'a-z')
+    container_name="pingu-${fuzzer}-${protocol}-${impl}"
+else
+    image_name=$(echo "pingu-${fuzzer}-${generator}-${protocol}-${impl}:${version:-latest}" | tr 'A-Z' 'a-z')
+    container_name="pingu-${fuzzer}-${generator}-${protocol}-${impl}"
+fi
 
 image_id=$(docker images -q "$image_name")
 if [[ -n "$image_id" ]]; then
@@ -75,8 +86,17 @@ fi
 log_success "[+] Ready to launch image: $image_id"
 cids=()
 for i in $(seq 1 $times); do
-    echo "docker run --name pingu-$fuzzer-$protocol-$impl-$i -d -it $image_name /bin/bash -c \"bash /home/user/profuzzbench/scripts/dispatch.sh $target run $fuzzer $timeout\""
-    id=$(docker run --name pingu-$fuzzer-$protocol-$impl-$i -d -it $image_name /bin/bash -c "bash /home/user/profuzzbench/scripts/dispatch.sh $target run $fuzzer $timeout")
+    cmd="docker run -it \
+        --cap-add=SYS_ADMIN \
+        -v .:/home/user/profuzzbench
+        --mount type=tmpfs,destination=/tmp,tmpfs-mode=777 \
+        --ulimit msgqueue=2097152000 \
+        --shm-size=64G \
+        --name $container_name-$i \
+        $image_name \
+        /bin/bash -c \"bash /home/user/profuzzbench/scripts/dispatch.sh $target run $fuzzer $timeout\""
+    echo "$cmd"
+    id=$(eval $cmd)
     log_success "[+] Launch docker container: $i"
     cids+=(${id::12}) # store only the first 12 characters of a container ID
 done
@@ -95,7 +115,7 @@ index=1
 for id in ${cids[@]}; do
     log_success "[+] Pulling fuzzing results from ${id}"
     ts=$(date +%s)
-    docker cp ${id}:${HOME}/target/$fuzzer/output.tar.gz ${output}/out-${fuzzer}-${protocol}-${impl}-${impl_version}-${index}-${ts}.tar.gz >/dev/null
+    docker cp ${id}:/home/user/target/${fuzzer}/output.tar.gz ${output}/out-${fuzzer}-${protocol}-${impl}-${impl_version}-${index}-${ts}.tar.gz >/dev/null
     if [ ! -z "$cleanup" ]; then
         docker rm ${id} >/dev/null
         log_success "[+] Container $id deleted"

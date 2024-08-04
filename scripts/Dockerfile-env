@@ -112,6 +112,7 @@ RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
 
 # FT-Net
 FROM builder as ft-net-builder
+# RUN echo "abc"
 COPY patches /tmp/patches
 RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
     --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
@@ -232,7 +233,7 @@ COPY --from=ft-net-builder ${HOME}/fuzztruction-net/env/check_env.sh /usr/bin/
 COPY --from=ft-net-builder ${HOME}/fuzztruction-net/fuzztruction-experiments ${HOME}/fuzztruction/fuzztruction-experiments
 
 # Copy pingu artifact
-RUN mkdir -p ${HOME}/fpingu/target/debug/
+RUN mkdir -p ${HOME}/pingu/target/debug/
 COPY --from=pingu-builder ${HOME}/pingu/target/debug/pingu ${HOME}/pingu/target/debug/pingu
 COPY --from=pingu-builder ${HOME}/pingu/target/debug/libfake_random.so ${HOME}/pingu/target/debug/libfake_random.so
 # TODO: copy artifact in the directory generator/pass
@@ -244,7 +245,14 @@ RUN sudo touch "/etc/ld.so.conf.d/pingu.conf" && \
 RUN mkdir -p ${HOME}/TLS-Anvil/TLS-Testsuite/
 COPY --from=tlsanvil-builder ${HOME}/TLS-Anvil/TLS-Testsuite/apps ${HOME}/TLS-Anvil/TLS-Testsuite/apps
 
-COPY . ${HOME}/profuzzbench
+# TODO: Copy profuzzbench folder to the container
 
-RUN sudo chown -R user:user ${HOME}/profuzzbench && \
-    sudo chmod +x ${HOME}/profuzzbench/scripts/*.sh 
+# COPY --chown=user:user . ${HOME}/profuzzbench
+# RUN sudo chmod +x ${HOME}/profuzzbench/scripts/*.sh 
+
+# Build libgcov_preload.so
+COPY scripts/gcov_preload.c gcov_preload.c
+RUN gcc -shared -fpic gcov_preload.c -o libgcov_preload.so && \
+    sudo touch "/etc/ld.so.conf.d/gcov.conf" && \
+    echo "${HOME}" | sudo tee "/etc/ld.so.conf.d/gcov.conf" && \
+    sudo ldconfig

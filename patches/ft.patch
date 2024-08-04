@@ -1,5 +1,5 @@
 diff --git a/generator/pass/fuzztruction-source-llvm-pass.cc b/generator/pass/fuzztruction-source-llvm-pass.cc
-index 67ea691..1322283 100644
+index 67ea691..236e8d8 100644
 --- a/generator/pass/fuzztruction-source-llvm-pass.cc
 +++ b/generator/pass/fuzztruction-source-llvm-pass.cc
 @@ -766,6 +766,9 @@ bool FuzztructionSourcePass::injectPatchPoints(Module &M) {
@@ -7,24 +7,38 @@ index 67ea691..1322283 100644
      dbgs() << "allowlisted_functions: " << allowlisted_functions.size() << "\n";
  
 +    auto blocklisted_functions = parse_env_var_list("FT_FUNCTION_BLOCKLIST");
-+    dbgs() << "blocklisted_functions: " << blocklisted_functions.size() << "\n";
-+
++    dbgs() << "allowlisted_functions: " << allowlisted_functions.size() << "\n";
++    
      auto allowlisted_files = parse_env_var_list("FT_FILE_ALLOWLIST");
      dbgs() << "allowlisted_files: " << allowlisted_files.size() << "\n";
  
-@@ -786,11 +789,11 @@ bool FuzztructionSourcePass::injectPatchPoints(Module &M) {
+@@ -786,12 +789,6 @@ bool FuzztructionSourcePass::injectPatchPoints(Module &M) {
          }
      }
  
 -    auto allowlisted_files = parse_env_var_list("FT_FILE_ALLOWLIST");
 -    dbgs() << "allowlisted_files: " << allowlisted_files.size() << "\n";
-+    //auto allowlisted_files = parse_env_var_list("FT_FILE_ALLOWLIST");
-+    //dbgs() << "allowlisted_files: " << allowlisted_files.size() << "\n";
- 
+-
 -    auto blocklisted_files = parse_env_var_list("FT_FILE_BLOCKLIST");
 -    dbgs() << "blocklisted_files: " << blocklisted_files.size() << "\n";
-+    //auto blocklisted_files = parse_env_var_list("FT_FILE_BLOCKLIST");
-+    //dbgs() << "blocklisted_files: " << blocklisted_files.size() << "\n";
- 
+-
      if (allowlisted_files.size() > 0) {
          if (std::find(allowlisted_files.begin(), allowlisted_files.end(), M.getSourceFileName()) != allowlisted_files.end()) {
+             dbgs() << "FT: File is listed as allowed " << M.getSourceFileName() << "\n";
+diff --git a/scheduler/src/checks.rs b/scheduler/src/checks.rs
+index 2689dde..443c2dc 100644
+--- a/scheduler/src/checks.rs
++++ b/scheduler/src/checks.rs
+@@ -134,8 +134,8 @@ pub fn check_system() -> Result<()> {
+     check_fs_suid_dumpable()?;
+     check_if_tmp_is_tmpfs()?;
+     check_if_agent_is_in_path()?;
+-    check_scaling_governor()?;
+-    check_perf_event_paranoid()?;
+-    check_file_limit()?;
+-    check_mqueue_queues_max()?;
++    // check_scaling_governor()?;
++    // check_perf_event_paranoid()?;
++    // check_file_limit()?;
++    // check_mqueue_queues_max()?;
+     Ok(())

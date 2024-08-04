@@ -1,0 +1,10 @@
+source:
+  bin-path: "/home/user/target/ft/generator/openssl/apps/openssl"
+  env:
+    - LD_LIBRARY_PATH: "/home/user/target/ft/generator/openssl"
+  arguments: ["s_client", "-connect", "localhost:4433", "-reconnect"]
+  input-type: Tcp
+  output-type: Tcp
+  is-server: false
+  log-stdout: false
+  log-stderr: false
