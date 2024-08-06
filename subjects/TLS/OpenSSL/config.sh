@@ -155,7 +155,7 @@ function build_ft_consumer {
     # export AFL_LLVM_LAF_TRANSFORM_COMPARES=1
     # export AFL_LLVM_LAF_SPLIT_COMPARES=1
 
-    ./config --with-rand-seed=none no-shared no-threads no-tests no-asm no-cached-fetch no-async enable-asan
+    ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async enable-asan
     bear -- make -j
 
     rm -rf fuzz
