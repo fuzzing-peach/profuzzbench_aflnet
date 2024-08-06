@@ -24,12 +24,9 @@ function build_aflnet {
 
     ./autogen.sh
     ./configure --enable-static --enable-shared=no
-    make examples/server/server -j
+    make examples/server/server ${MAKE_OPT}
 
     popd >/dev/null
-
-    cp profuzzbench/test.fullchain.pem target/aflnet/wolfssl
-    cp profuzzbench/test.key.pem target/aflnet/wolfssl
 }
 
 function replay {
@@ -48,9 +45,7 @@ function run_aflnet {
     mkdir -p $outdir
     rm -rf $outdir/*
 
-    export AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1
     export AFL_SKIP_CPUFREQ=1
-    export AFL_NO_AFFINITY=1
     export AFL_PRELOAD=libfake_random.so
     export FAKE_RANDOM=1
 
@@ -58,7 +53,10 @@ function run_aflnet {
         $HOME/aflnet/afl-fuzz -d -i $indir \
         -o $outdir -N tcp://127.0.0.1/4433 \
         -P TLS -D 10000 -q 3 -s 3 -E -K -R -W 100 -m none \
-        ./examples/server/server -c test.fullchain.pem -k test.key.pem -e -p 4433
+        ./examples/server/server \
+        -c ${HOME}/profuzzbench/test.fullchain.pem \
+        -k ${HOME}/profuzzbench/test.key.pem \
+        -e -p 4433
 
     list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
     pushd $HOME/target/gcov/wolfssl >/dev/null
@@ -100,14 +98,11 @@ function build_gcov {
     export LDFLAGS="-fprofile-arcs -ftest-coverage"
 
     ./configure --enable-static --enable-shared=no
-    make examples/server/server -j
+    make examples/server/server ${MAKE_OPT}
 
     rm -rf a-conftest.gcno
 
     popd >/dev/null
-
-    cp profuzzbench/test.fullchain.pem target/gcov/wolfssl
-    cp profuzzbench/test.key.pem target/gcov/wolfssl
 }
 
 function build_vanilla {
@@ -118,12 +113,9 @@ function build_vanilla {
 
     ./autogen.sh
     ./configure --enable-static --enable-shared=no
-    make examples/server/server -j
+    make examples/server/server ${MAKE_OPT}
 
     popd >/dev/null
-
-    cp profuzzbench/test.fullchain.pem target/vanilla/wolfssl
-    cp profuzzbench/test.key.pem target/vanilla/wolfssl
 }
 
 function build_pingu {

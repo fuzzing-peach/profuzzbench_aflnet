@@ -88,7 +88,7 @@ cids=()
 for i in $(seq 1 $times); do
     cmd="docker run -it \
         --cap-add=SYS_ADMIN \
-        -v .:/home/user/profuzzbench
+        -v .:/home/user/profuzzbench \
         --mount type=tmpfs,destination=/tmp,tmpfs-mode=777 \
         --ulimit msgqueue=2097152000 \
         --shm-size=64G \

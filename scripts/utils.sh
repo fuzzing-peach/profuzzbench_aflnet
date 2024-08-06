@@ -86,7 +86,7 @@ function compute_coverage {
 
   # output the header of the coverage file which is in the CSV format
   # Time: timestamp, l_per/b_per and l_abs/b_abs: line/branch coverage in percentage and absolutate number
-  echo "Time,l_per,l_abs,b_per,b_abs" >>$covfile
+  echo "time,l_per,l_abs,b_per,b_abs" >>$covfile
 
   # process other testcases
   count=0
