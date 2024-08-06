@@ -61,7 +61,8 @@ else
     image_name=$(echo "pingu-${fuzzer}-${generator}-${protocol}-${impl}:${version:-latest}" | tr 'A-Z' 'a-z')
 fi
 
-log_success "[+] Building docker image: $image_name"
+log_success "[+] Building docker image: ${image_name}"
+log_success "[+] Docker build args: ${docker_args}"
 # If http proxy is required, passing:
 # --build-arg HTTP_PROXY=http://172.17.0.1:7890 --build-arg HTTPS_PROXY=http://172.17.0.1:7890
 # If needs to add dns server, passing:
