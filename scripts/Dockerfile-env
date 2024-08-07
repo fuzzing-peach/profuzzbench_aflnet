@@ -35,7 +35,7 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/var/lib/
     libcap-dev libpcap-dev tcpdump \
     rsync autopoint gperf texinfo gettext \
     python3 python3-pip python3-dev python3-setuptools python-is-python3 openjdk-11-jdk \
-    vim nano screen htop man wget httpie bash-completion ripgrep iputils-ping telnet net-tools ncat netcat-traditional \
+    vim nano screen htop man wget httpie bash-completion ripgrep iputils-ping iproute2 telnet net-tools ncat netcat-traditional \
     zsh autojump fzf \
     && rm -rf /var/lib/apt/lists
 
@@ -69,7 +69,8 @@ ENV GROUP_ID=${GROUP_ID}
 # so we use the 'user' as the default
 # to avoid the conflict between ${USER_ID} and the id of 'ubuntu'
 # here we remove the existed user 'ubuntu'
-RUN userdel $(getent passwd ${USER_ID} | cut -d: -f1) || groupdel $(getent group ${GROUP_ID} | cut -d: -f1)
+RUN userdel $(getent passwd ${USER_ID} | cut -d: -f1) || true
+RUN groupdel $(getent group ${GROUP_ID} | cut -d: -f1) || true
 RUN groupadd -g ${GROUP_ID} user && \
     useradd -u ${USER_ID} -rm -d /home/user -s /usr/bin/zsh -g user -G sudo user -p "$(openssl passwd -1 user)" && \
     echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
@@ -118,7 +119,6 @@ RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
 
 # FT-Net
 FROM builder as ft-net-builder
-# RUN echo "abc"
 COPY patches /tmp/patches
 RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
     --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
@@ -226,7 +226,8 @@ RUN cd /tmp && \
 RUN mkdir -p ${HOME}/fuzztruction/target/release/ && \
     mkdir -p ${HOME}/fuzztruction/target/debug/ && \
     mkdir -p ${HOME}/fuzztruction/generator/pass/ && \
-    mkdir -p ${HOME}/fuzztruction/consumer/aflpp-consumer
+    mkdir -p ${HOME}/fuzztruction/consumer/aflpp-consumer && \
+    mkdir -p ${HOME}/fuzztruction/eval-result
 COPY --from=ft-net-builder ${HOME}/fuzztruction-net/consumer/aflpp-consumer ${HOME}/fuzztruction/consumer/aflpp-consumer
 COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/fuzztruction ${HOME}/fuzztruction/target/release/fuzztruction
 COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.a ${HOME}/fuzztruction/target/release/libgenerator_agent.a
@@ -264,3 +265,7 @@ RUN gcc -shared -fpic gcov_preload.c -o libgcov_preload.so && \
     sudo touch "/etc/ld.so.conf.d/gcov.conf" && \
     echo "${HOME}" | sudo tee "/etc/ld.so.conf.d/gcov.conf" && \
     sudo ldconfig
+
+# Disable ASLR fowever
+RUN echo "kernel.randomize_va_space = 0" | sudo tee -a /etc/sysctl.d/01-disable-aslr.conf && \
+    sudo sysctl -p /etc/sysctl.d/01-disable-aslr.conf

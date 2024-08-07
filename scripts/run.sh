@@ -87,7 +87,9 @@ log_success "[+] Ready to launch image: $image_id"
 cids=()
 for i in $(seq 1 $times); do
     cmd="docker run -it \
-        --cap-add=SYS_ADMIN \
+        --cap-add=SYS_ADMIN --cap-add=SYS_RAWIO \
+        --security-opt seccomp=unconfined \
+        --security-opt apparmor=unconfined \
         -v .:/home/user/profuzzbench \
         --mount type=tmpfs,destination=/tmp,tmpfs-mode=777 \
         --ulimit msgqueue=2097152000 \
