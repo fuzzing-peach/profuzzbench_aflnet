@@ -509,6 +509,26 @@ index 8886de7..4d91cc4 100644
 +    }
 +    Ok(false)
 +}
+diff --git a/scheduler/src/fuzzer/worker_impl/init.rs b/scheduler/src/fuzzer/worker_impl/init.rs
+index 728d127..a2d288b 100644
+--- a/scheduler/src/fuzzer/worker_impl/init.rs
++++ b/scheduler/src/fuzzer/worker_impl/init.rs
+@@ -37,15 +37,6 @@ impl FuzzingWorker {
+         self.source = Some(Source::from_config(&self.config, Some(self.uid.0), None)?);
+         self.sink = Some(AflSink::from_config(&self.config, Some(self.uid.0), None)?);
+ 
+-        let ret = unsafe { libc::unshare(libc::CLONE_NEWNET) };
+-        assert!(ret == 0);
+-
+-        let ret = process::Command::new("ip")
+-            .args(["link", "set", "dev", "lo", "up"])
+-            .spawn()?
+-            .wait_with_output()?;
+-        log::info!("ret={:?}", ret);
+-
+         self.source.as_mut().unwrap().start()?;
+         self.sink.as_mut().unwrap().start()?;
+         self.resize_bitmaps();
 diff --git a/scheduler/src/source.rs b/scheduler/src/source.rs
 index 549ac57..fac4a0b 100644
 --- a/scheduler/src/source.rs
