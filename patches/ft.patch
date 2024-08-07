@@ -510,7 +510,7 @@ index 8886de7..4d91cc4 100644
 +    Ok(false)
 +}
 diff --git a/scheduler/src/source.rs b/scheduler/src/source.rs
-index 549ac57..be2c646 100644
+index 549ac57..fac4a0b 100644
 --- a/scheduler/src/source.rs
 +++ b/scheduler/src/source.rs
 @@ -465,7 +465,7 @@ impl Source {
@@ -522,3 +522,30 @@ index 549ac57..be2c646 100644
                  Some(jail.build()?)
              } else {
                  None
+@@ -740,8 +740,24 @@ impl Source {
+                     assert_eq!(ret, 0);
+ 
+                     // Disable ASLR since we rely on all instances having the same memory layout.
+-                    let ret = libc::personality(libc::ADDR_NO_RANDOMIZE as u64);
+-                    assert_eq!(ret, 0);
++                    let _ = libc::personality(libc::ADDR_NO_RANDOMIZE as u64);
++                    let check_personality = libc::personality(0xffffffff);
++                    if check_personality & libc::ADDR_NO_RANDOMIZE == 0 {
++                        let err = std::io::Error::last_os_error();
++                        let errno = err.raw_os_error().unwrap_or(0);
++                        match errno {
++                            libc::EINVAL => {
++                                log::error!("Invalid argument");
++                            }
++                            libc::EPERM => {
++                                log::error!("Operation not permitted");
++                            }
++                            _ => {
++                                log::error!("Unknown error: {}", errno);
++                            }
++                        }
++                        panic!("Failed to disable ASLR");
++                    }
+ 
+                     if let Some(ref mut jail) = self.jail {
+                         // ! Make sure that the code in `enter()` is async-signal-safe since we
