@@ -29,7 +29,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/var/lib/apt \
     apt update -y && yes | unminimize && apt-mark hold "llvm-*" && apt-mark hold "clang-*" && \
     apt install -y \
-    apt-utils git build-essential curl libc++-dev sudo libtool libtool-bin libz-dev libglib2.0-dev graphviz-dev bison flex automake libpixman-1-dev cgroup-tools \
+    apt-utils git build-essential mold curl libc++-dev sudo libtool libtool-bin libz-dev libglib2.0-dev graphviz-dev bison flex automake libpixman-1-dev cgroup-tools \
     cmake bear autoconf pkg-config gdb strace \
     openssh-server openssl libssl-dev libgnutls28-dev \
     libcap-dev libpcap-dev tcpdump \
@@ -79,13 +79,24 @@ COPY patches /tmp/patches
 # Rust
 ENV RUSTUP_DIST_SERVER=https://rsproxy.cn
 ENV RUSTUP_UPDATE_ROOT=https://rsproxy.cn/rustup
-RUN --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
-    --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain stable && \
-    printf "[source.crates-io]\nreplace-with = \"rsproxy-sparse\"\n\n[source.rsproxy-sparse]\nregistry = \"sparse+https://rsproxy.cn/index/\"" > "$HOME/.cargo/config.toml"
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain stable
+    # printf "[source.crates-io]\nreplace-with = \"rsproxy-sparse\"\n\n[source.rsproxy-sparse]\nregistry = \"sparse+https://rsproxy.cn/index/\"" > "$HOME/.cargo/config.toml"
 COPY scripts/.zshrc ${HOME}/.zshrc
 COPY scripts/.p10k.zsh ${HOME}/.p10k.zsh
 RUN zsh -c ". ~/.zshrc"
+RUN ${HOME}/.cargo/bin/cargo install grcov
+# RUN printf "[target.x86_64-unknown-linux-gnu]\nlinker = \"clang\"\nrustflags = [\"-C\", \"link-arg=-fuse-ld=/usr/bin/mold\"]" > "$HOME/.cargo/config.toml"
+RUN echo $'\
+[source.crates-io]\n\
+replace-with = "rsproxy-sparse"\n\
+\n\
+[source.rsproxy-sparse]\n\
+registry = "sparse+https://rsproxy.cn/index/"\n\
+\n\
+[target.x86_64-unknown-linux-gnu]\n\
+linker = "clang"\n\
+rustflags = ["-C", "link-arg=-fuse-ld=/usr/bin/mold"]\
+' > "$HOME/.cargo/config.toml"
 ##############
 # End of user setup
 
@@ -95,9 +106,7 @@ RUN zsh -c ". ~/.zshrc"
 # Environments and fuzzer tools
 ##############
 ARG GITHUB_TOKEN
-RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
-    --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
-    git clone https://Kherrisan:$GITHUB_TOKEN@github.com/Kherrisan/pingu.git && \
+RUN git clone https://Kherrisan:$GITHUB_TOKEN@github.com/Kherrisan/pingu.git && \
     cd pingu && \
     echo "nightly-2024-02-14" >> rust-toolchain && \
     git submodule update --init && \
@@ -109,9 +118,7 @@ RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
 # RUN cd pingu/fuzztruction/generator/pass && \
 
 # FT-Net
-RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
-    --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
-    git clone https://github.com/fuzztruction/fuzztruction-net && \
+RUN git clone https://github.com/fuzztruction/fuzztruction-net && \
     cd fuzztruction-net && \
     git apply /tmp/patches/ft.patch && \
     echo "nightly-2023-10-10" >> rust-toolchain && \
@@ -200,16 +207,19 @@ RUN cd /tmp && \
     wget https://github.com/rr-debugger/rr/releases/download/5.7.0/rr-5.7.0-Linux-$(uname -m).deb && \
     sudo dpkg -i rr-5.7.0-Linux-$(uname -m).deb
 
-# Copy FT-Net artifact
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/data/ld_fuzztruction.conf /etc/ld.so.conf.d/fuzztruction.conf
+# Register so
+RUN sudo touch "/etc/ld.so.conf.d/ft-net.conf" && \
+    echo "/home/user/fuzztruction-net/target/debug" | sudo tee "/etc/ld.so.conf.d/ft-net.conf" && \
+    echo "/home/user/fuzztruction-net/target/release" | sudo tee "/etc/ld.so.conf.d/ft-net.conf" && \
+    sudo ldconfig
 
-# Copy pingu artifact
+# Register so
 RUN sudo touch "/etc/ld.so.conf.d/pingu.conf" && \
     echo "${HOME}/pingu/target/debug" | sudo tee "/etc/ld.so.conf.d/pingu.conf" && \
     sudo ldconfig
 
-# COPY --chown=user:user . ${HOME}/profuzzbench
-# RUN sudo chmod +x ${HOME}/profuzzbench/scripts/*.sh 
+COPY --chown=user:user . ${HOME}/profuzzbench
+RUN sudo chmod +x ${HOME}/profuzzbench/scripts/*.sh 
 
 # Build libgcov_preload.so
 COPY scripts/gcov_preload.c gcov_preload.c
