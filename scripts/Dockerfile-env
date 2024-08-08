@@ -1,4 +1,4 @@
-# FT-Net: https://github.com/fuzztruction/fuzztruction-net
+# FT-Net: https://github.com/fuzztruction-net/fuzztruction-net
 FROM nbars/fuzztruction-llvm_debug:llvmorg-17.0.6 as llvm
 
 # ubuntu:22.04 
@@ -115,14 +115,14 @@ RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
     cd ../pingu-fuzzer && \
     ${HOME}/.cargo/bin/cargo build
 # TODO: build pass and clang-fast
-# RUN cd pingu/fuzztruction/generator/pass && \
+# RUN cd pingu/fuzztruction-net/generator/pass && \
 
 # FT-Net
 FROM builder as ft-net-builder
 COPY patches /tmp/patches
 RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
     --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
-    git clone https://github.com/fuzztruction/fuzztruction-net && \
+    git clone https://github.com/fuzztruction-net/fuzztruction-net && \
     cd fuzztruction-net && \
     git apply /tmp/patches/ft.patch && \
     echo "nightly-2023-10-10" >> rust-toolchain && \
@@ -223,23 +223,23 @@ RUN cd /tmp && \
     sudo dpkg -i rr-5.7.0-Linux-$(uname -m).deb
 
 # Copy FT-Net artifact
-RUN mkdir -p ${HOME}/fuzztruction/target/release/ && \
-    mkdir -p ${HOME}/fuzztruction/target/debug/ && \
-    mkdir -p ${HOME}/fuzztruction/generator/pass/ && \
-    mkdir -p ${HOME}/fuzztruction/consumer/aflpp-consumer && \
-    mkdir -p ${HOME}/fuzztruction/eval-result
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/consumer/aflpp-consumer ${HOME}/fuzztruction/consumer/aflpp-consumer
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/fuzztruction ${HOME}/fuzztruction/target/release/fuzztruction
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.a ${HOME}/fuzztruction/target/release/libgenerator_agent.a
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so ${HOME}/fuzztruction/target/release/libgenerator_agent.so
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so ${HOME}/fuzztruction/target/release/libgenerator_agent.so
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast ${HOME}/fuzztruction/generator/pass/fuzztruction-source-clang-fast
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast++ ${HOME}/fuzztruction/generator/pass/fuzztruction-source-clang-fast++
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-llvm-pass.so ${HOME}/fuzztruction/generator/pass/fuzztruction-source-llvm-pass.so
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/mem_functions.ll ${HOME}/fuzztruction/generator/pass/mem_functions.ll
+RUN mkdir -p ${HOME}/fuzztruction-net/target/release/ && \
+    mkdir -p ${HOME}/fuzztruction-net/target/debug/ && \
+    mkdir -p ${HOME}/fuzztruction-net/generator/pass/ && \
+    mkdir -p ${HOME}/fuzztruction-net/consumer/aflpp-consumer && \
+    mkdir -p ${HOME}/fuzztruction-net/eval-result
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/consumer/aflpp-consumer ${HOME}/fuzztruction-net/consumer/aflpp-consumer
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/fuzztruction ${HOME}/fuzztruction-net/target/release/fuzztruction
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.a ${HOME}/fuzztruction-net/target/release/libgenerator_agent.a
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast++ ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast++
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-llvm-pass.so ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-llvm-pass.so
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/mem_functions.ll ${HOME}/fuzztruction-net/generator/pass/mem_functions.ll
 COPY --from=ft-net-builder ${HOME}/fuzztruction-net/data/ld_fuzztruction.conf /etc/ld.so.conf.d/fuzztruction.conf
 COPY --from=ft-net-builder ${HOME}/fuzztruction-net/env/check_env.sh /usr/bin/
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/fuzztruction-experiments ${HOME}/fuzztruction/fuzztruction-experiments
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/fuzztruction-experiments ${HOME}/fuzztruction-net/fuzztruction-experiments
 
 # Copy pingu artifact
 RUN mkdir -p ${HOME}/pingu/target/debug/

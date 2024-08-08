@@ -7,7 +7,7 @@ function checkout {
     git clone https://gitee.com/sz_abundance/openssl.git repo/openssl
     pushd repo/openssl >/dev/null
     git checkout "$@"
-    git apply ${HOME}/fuzztruction/fuzztruction-experiments/comparison-with-state-of-the-art/binaries/networked/openssl/fuzzing.patch
+    git apply ${HOME}/fuzztruction-net/fuzztruction-experiments/comparison-with-state-of-the-art/binaries/networked/openssl/fuzzing.patch
     popd >/dev/null
 }
 
@@ -125,15 +125,15 @@ function build_ft_generator {
 
     export FT_CALL_INJECTION=1
     export FT_HOOK_INS=branch,load,store,select,switch
-    export CC=${HOME}/fuzztruction/generator/pass/fuzztruction-source-clang-fast
-    export CXX=${HOME}/fuzztruction/generator/pass/fuzztruction-source-clang-fast++
+    export CC=${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast
+    export CXX=${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast++
     export CFLAGS="-O3 -g -DNDEBUG -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_GENEARTOR"
     export CXXFLAGS="-O3 -DNDEBUG -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_GENEARTOR"
-    export GENERATOR_AGENT_SO_DIR="${HOME}/fuzztruction/target/release/"
-    export LLVM_PASS_SO="${HOME}/fuzztruction/generator/pass/fuzztruction-source-llvm-pass.so"
+    export GENERATOR_AGENT_SO_DIR="${HOME}/fuzztruction-net/target/release/"
+    export LLVM_PASS_SO="${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-llvm-pass.so"
 
     ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async
-    LDCMD=${HOME}/fuzztruction/generator/pass/fuzztruction-source-clang-fast bear -- make ${MAKE_OPT}
+    LDCMD=${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast bear -- make ${MAKE_OPT}
 
     rm -rf fuzz
     rm -rf test
@@ -148,7 +148,7 @@ function build_ft_consumer {
     cp -r repo/openssl target/ft/consumer/openssl
     pushd target/ft/consumer/openssl >/dev/null
 
-    export AFL_PATH=${HOME}/fuzztruction/consumer/aflpp-consumer
+    export AFL_PATH=${HOME}/fuzztruction-net/consumer/aflpp-consumer
     export CC=${AFL_PATH}/afl-clang-fast
     export CXX=${AFL_PATH}/afl-clang-fast++
     export CFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER -fsanitize=address"
@@ -187,10 +187,10 @@ function run_ft {
     cat ${HOME}/profuzzbench/subjects/TLS/${consumer}/ft-sink.yaml >> ft.yaml
 
     # running ft-net
-    sudo ${HOME}/fuzztruction/target/release/fuzztruction ft.yaml fuzz -t ${timeout}s
+    sudo ${HOME}/fuzztruction-net/target/release/fuzztruction ft.yaml fuzz -t ${timeout}s
 
     # collecting coverage results
-    sudo ${HOME}/fuzztruction/target/release/fuzztruction ft.yaml gcov -t 3s
+    sudo ${HOME}/fuzztruction-net/target/release/fuzztruction ft.yaml gcov -t 3s
 
     tar -zcvf output.tar.gz $work_dir
 
@@ -200,8 +200,8 @@ function run_ft {
 function build_gcov {
     mkdir -p target/gcov
     rm -rf target/gcov/*
-    cp -r repo/openssl target/gcov/openssl
-    pushd target/gcov/openssl >/dev/null
+    cp -r repo/openssl target/gcov/consumer/openssl
+    pushd target/gcov/consumer/openssl >/dev/null
 
     export CFLAGS="-fprofile-arcs -ftest-coverage"
     export LDFLAGS="-fprofile-arcs -ftest-coverage"

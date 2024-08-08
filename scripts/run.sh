@@ -87,7 +87,7 @@ log_success "[+] Ready to launch image: $image_id"
 cids=()
 for i in $(seq 1 $times); do
     cmd="docker run -it \
-        --cap-add=SYS_ADMIN --cap-add=SYS_RAWIO \
+        --cap-add=SYS_ADMIN --cap-add=SYS_RAWIO --cap-add=SYS_PTRACE \
         --security-opt seccomp=unconfined \
         --security-opt apparmor=unconfined \
         -v .:/home/user/profuzzbench \
