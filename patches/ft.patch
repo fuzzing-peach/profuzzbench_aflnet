@@ -69,10 +69,10 @@ index 67ea691..236e8d8 100644
          if (std::find(allowlisted_files.begin(), allowlisted_files.end(), M.getSourceFileName()) != allowlisted_files.end()) {
              dbgs() << "FT: File is listed as allowed " << M.getSourceFileName() << "\n";
 diff --git a/lib/jail/src/jail.rs b/lib/jail/src/jail.rs
-index 3aa7cd0..3db6762 100644
+index 3aa7cd0..36c6797 100644
 --- a/lib/jail/src/jail.rs
 +++ b/lib/jail/src/jail.rs
-@@ -118,7 +118,7 @@ impl Jail {
+@@ -118,12 +118,12 @@ impl Jail {
          // Mount the bear minimum to allow execution of software.
  
          // Mount / into our new root
@@ -81,6 +81,23 @@ index 3aa7cd0..3db6762 100644
              .context("Failed to mount / into new root")?;
          Jail::remount_bind_mount_ro(&self.new_root).context("Failed to remount / as ro")?;
  
+         let default_ro_source_dirs = [
+-            "/home/user/fuzztruction",
++            "/home/user/fuzztruction-net",
+             "/etc/hosts",
+             "/etc/hostname",
+             "/etc/resolv.conf",
+@@ -134,8 +134,8 @@ impl Jail {
+             Jail::remount_bind_mount_ro(&dst).context("Failed to remount as ro")?;
+         }
+ 
+-        let dst = format!("{}{}", &self.new_root, "/home/user/fuzztruction/eval-result");
+-        Jail::mount(&["--bind",  "/home/user/fuzztruction/eval-result", &dst]).context("Failed to mount eval-result RW")?;
++        let dst = format!("{}{}", &self.new_root, "/home/user/fuzztruction-net/eval-result");
++        Jail::mount(&["--bind",  "/home/user/fuzztruction-net/eval-result", &dst]).context("Failed to mount eval-result RW")?;
+ 
+         // Mount /proc, /sys and /dev. These are shared since they are also marked as shared in the "parent" namespace.
+         Jail::mount(&["-o", "bind", "/proc", &format!("{}/proc", self.new_root)])
 diff --git a/scheduler/src/checks.rs b/scheduler/src/checks.rs
 index 2689dde..68c2bd8 100644
 --- a/scheduler/src/checks.rs

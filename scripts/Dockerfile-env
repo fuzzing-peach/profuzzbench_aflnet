@@ -29,7 +29,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/var/lib/apt \
     apt update -y && yes | unminimize && apt-mark hold "llvm-*" && apt-mark hold "clang-*" && \
     apt install -y \
-    apt-utils git build-essential curl libc++-dev sudo libtool libtool-bin libz-dev libglib2.0-dev graphviz-dev bison flex automake libpixman-1-dev cgroup-tools \
+    apt-utils git build-essential mold curl libc++-dev sudo libtool libtool-bin libz-dev libglib2.0-dev graphviz-dev bison flex automake libpixman-1-dev cgroup-tools \
     cmake bear autoconf pkg-config gdb strace \
     openssh-server openssl libssl-dev libgnutls28-dev \
     libcap-dev libpcap-dev tcpdump \
@@ -92,6 +92,7 @@ RUN --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
 COPY scripts/.zshrc ${HOME}/.zshrc
 COPY scripts/.p10k.zsh ${HOME}/.p10k.zsh
 RUN zsh -c ". ~/.zshrc"
+RUN ${HOME}/.cargo/bin/cargo install grcov
 ##############
 # End of user setup
 
@@ -114,8 +115,6 @@ RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
     git submodule update --init && \
     cd ../pingu-fuzzer && \
     ${HOME}/.cargo/bin/cargo build
-# TODO: build pass and clang-fast
-# RUN cd pingu/fuzztruction/generator/pass && \
 
 # FT-Net
 FROM builder as ft-net-builder
@@ -131,9 +130,6 @@ RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
     cd consumer/aflpp-consumer && \ 
     make clean && \ 
     make all ${MAKE_OPT}
-# TODO: do we really need to build generator/pass manually? Or it is built alongside with cargo build?
-# RUN cd fuzztruction-net/generator/pass && \
-#     make ${MAKE_OPT}
 
 # TLS-Anvil
 # Change the maven mirror ?
@@ -223,23 +219,25 @@ RUN cd /tmp && \
     sudo dpkg -i rr-5.7.0-Linux-$(uname -m).deb
 
 # Copy FT-Net artifact
-RUN mkdir -p ${HOME}/fuzztruction/target/release/ && \
-    mkdir -p ${HOME}/fuzztruction/target/debug/ && \
-    mkdir -p ${HOME}/fuzztruction/generator/pass/ && \
-    mkdir -p ${HOME}/fuzztruction/consumer/aflpp-consumer && \
-    mkdir -p ${HOME}/fuzztruction/eval-result
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/consumer/aflpp-consumer ${HOME}/fuzztruction/consumer/aflpp-consumer
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/fuzztruction ${HOME}/fuzztruction/target/release/fuzztruction
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.a ${HOME}/fuzztruction/target/release/libgenerator_agent.a
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so ${HOME}/fuzztruction/target/release/libgenerator_agent.so
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so ${HOME}/fuzztruction/target/release/libgenerator_agent.so
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast ${HOME}/fuzztruction/generator/pass/fuzztruction-source-clang-fast
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast++ ${HOME}/fuzztruction/generator/pass/fuzztruction-source-clang-fast++
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-llvm-pass.so ${HOME}/fuzztruction/generator/pass/fuzztruction-source-llvm-pass.so
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/mem_functions.ll ${HOME}/fuzztruction/generator/pass/mem_functions.ll
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/data/ld_fuzztruction.conf /etc/ld.so.conf.d/fuzztruction.conf
+RUN mkdir -p ${HOME}/fuzztruction-net/target/release/ && \
+    mkdir -p ${HOME}/fuzztruction-net/target/debug/ && \
+    mkdir -p ${HOME}/fuzztruction-net/generator/pass/ && \
+    mkdir -p ${HOME}/fuzztruction-net/consumer/aflpp-consumer && \
+    mkdir -p ${HOME}/fuzztruction-net/eval-result
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/consumer/aflpp-consumer ${HOME}/fuzztruction-net/consumer/aflpp-consumer
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/fuzztruction ${HOME}/fuzztruction-net/target/release/fuzztruction
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.a ${HOME}/fuzztruction-net/target/release/libgenerator_agent.a
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so ${HOME}/fuzztruction-net/target/release/libgenerator_agent.so
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast++ ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast++
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-llvm-pass.so ${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-llvm-pass.so
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/mem_functions.ll ${HOME}/fuzztruction-net/generator/pass/mem_functions.ll
 COPY --from=ft-net-builder ${HOME}/fuzztruction-net/env/check_env.sh /usr/bin/
-COPY --from=ft-net-builder ${HOME}/fuzztruction-net/fuzztruction-experiments ${HOME}/fuzztruction/fuzztruction-experiments
+COPY --from=ft-net-builder ${HOME}/fuzztruction-net/fuzztruction-experiments ${HOME}/fuzztruction-net/fuzztruction-experiments
+RUN sudo touch "/etc/ld.so.conf.d/ft-net.conf" && \
+    echo "${HOME}/fuzztruction-net/target/debug" | sudo tee -a "/etc/ld.so.conf.d/ft-net.conf" && \
+    echo "${HOME}/fuzztruction-net/target/release" | sudo tee -a "/etc/ld.so.conf.d/ft-net.conf" && \
+    sudo ldconfig
 
 # Copy pingu artifact
 RUN mkdir -p ${HOME}/pingu/target/debug/
