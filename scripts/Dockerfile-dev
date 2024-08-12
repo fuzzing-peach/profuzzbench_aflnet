@@ -73,30 +73,21 @@ USER user
 WORKDIR /home/user
 ENV HOME=/home/user
 
-RUN git config --global http.version HTTP/1.1
-COPY patches /tmp/patches
+RUN git config --global http.version HTTP/1.1 && \
+    git config --global user.name Kherrisan && \
+    git config --global user.email zdkscope@outlook.com
+    
+COPY patches /tmp/patches  
 
 # Rust
-ENV RUSTUP_DIST_SERVER=https://rsproxy.cn
+ENV  _DIST_SERVER=https://rsproxy.cn
 ENV RUSTUP_UPDATE_ROOT=https://rsproxy.cn/rustup
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain stable
-    # printf "[source.crates-io]\nreplace-with = \"rsproxy-sparse\"\n\n[source.rsproxy-sparse]\nregistry = \"sparse+https://rsproxy.cn/index/\"" > "$HOME/.cargo/config.toml"
+COPY scripts/cargo.toml ${HOME}/.cargo/
 COPY scripts/.zshrc ${HOME}/.zshrc
 COPY scripts/.p10k.zsh ${HOME}/.p10k.zsh
 RUN zsh -c ". ~/.zshrc"
 RUN ${HOME}/.cargo/bin/cargo install grcov
-# RUN printf "[target.x86_64-unknown-linux-gnu]\nlinker = \"clang\"\nrustflags = [\"-C\", \"link-arg=-fuse-ld=/usr/bin/mold\"]" > "$HOME/.cargo/config.toml"
-RUN echo $'\
-[source.crates-io]\n\
-replace-with = "rsproxy-sparse"\n\
-\n\
-[source.rsproxy-sparse]\n\
-registry = "sparse+https://rsproxy.cn/index/"\n\
-\n\
-[target.x86_64-unknown-linux-gnu]\n\
-linker = "clang"\n\
-rustflags = ["-C", "link-arg=-fuse-ld=/usr/bin/mold"]\
-' > "$HOME/.cargo/config.toml"
 ##############
 # End of user setup
 
