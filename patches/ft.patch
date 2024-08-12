@@ -41,33 +41,6 @@ index 47294d0..45bd76d 100644
      self->argv[self->argc++] = "-lgenerator_agent";
      self->argv[self->argc++] = "-DNDEBUG";
  
-diff --git a/generator/pass/fuzztruction-source-llvm-pass.cc b/generator/pass/fuzztruction-source-llvm-pass.cc
-index 67ea691..236e8d8 100644
---- a/generator/pass/fuzztruction-source-llvm-pass.cc
-+++ b/generator/pass/fuzztruction-source-llvm-pass.cc
-@@ -766,6 +766,9 @@ bool FuzztructionSourcePass::injectPatchPoints(Module &M) {
-     auto allowlisted_functions = parse_env_var_list("FT_FUNCTION_ALLOWLIST");
-     dbgs() << "allowlisted_functions: " << allowlisted_functions.size() << "\n";
- 
-+    auto blocklisted_functions = parse_env_var_list("FT_FUNCTION_BLOCKLIST");
-+    dbgs() << "allowlisted_functions: " << allowlisted_functions.size() << "\n";
-+    
-     auto allowlisted_files = parse_env_var_list("FT_FILE_ALLOWLIST");
-     dbgs() << "allowlisted_files: " << allowlisted_files.size() << "\n";
- 
-@@ -786,12 +789,6 @@ bool FuzztructionSourcePass::injectPatchPoints(Module &M) {
-         }
-     }
- 
--    auto allowlisted_files = parse_env_var_list("FT_FILE_ALLOWLIST");
--    dbgs() << "allowlisted_files: " << allowlisted_files.size() << "\n";
--
--    auto blocklisted_files = parse_env_var_list("FT_FILE_BLOCKLIST");
--    dbgs() << "blocklisted_files: " << blocklisted_files.size() << "\n";
--
-     if (allowlisted_files.size() > 0) {
-         if (std::find(allowlisted_files.begin(), allowlisted_files.end(), M.getSourceFileName()) != allowlisted_files.end()) {
-             dbgs() << "FT: File is listed as allowed " << M.getSourceFileName() << "\n";
 diff --git a/lib/jail/src/jail.rs b/lib/jail/src/jail.rs
 index 3aa7cd0..36c6797 100644
 --- a/lib/jail/src/jail.rs
@@ -288,16 +261,20 @@ index 036e283..cde3028 100644
          config.validate()?;
          Ok(config)
 diff --git a/scheduler/src/coverage/networked.rs b/scheduler/src/coverage/networked.rs
-index 8886de7..4d91cc4 100644
+index 8886de7..9ec7328 100644
 --- a/scheduler/src/coverage/networked.rs
 +++ b/scheduler/src/coverage/networked.rs
-@@ -1,11 +1,14 @@
+@@ -1,11 +1,17 @@
  use std::{
      cell::RefCell,
-+    ffi::CString,
-     fs,
+-    fs,
 -    process::Command,
++    env,
++    ffi::CString,
++    fs::{self, OpenOptions},
 +    io::{BufRead, BufReader, Write},
++    os::fd::AsRawFd,
++    path::PathBuf,
 +    process::{Command, Stdio},
      sync::{
          atomic::{self, AtomicBool},
@@ -307,7 +284,7 @@ index 8886de7..4d91cc4 100644
      time::{Duration, Instant},
  };
  
-@@ -18,9 +21,11 @@ use crate::{
+@@ -18,9 +24,12 @@ use crate::{
      source::Source,
  };
  
@@ -315,11 +292,12 @@ index 8886de7..4d91cc4 100644
  use anyhow::Result;
  use fuzztruction_shared::mutation_cache::MutationCache;
  use itertools::Itertools;
++use libc::fork;
 +use nix::unistd::execve;
  
  unsafe fn load_mutations(source: &mut Source, entry: &QueueEntry) -> Result<()> {
      let mutations = entry.mutations();
-@@ -39,6 +44,156 @@ unsafe fn load_mutations(source: &mut Source, entry: &QueueEntry) -> Result<()>
+@@ -39,6 +48,246 @@ unsafe fn load_mutations(source: &mut Source, entry: &QueueEntry) -> Result<()>
      Ok(())
  }
  
@@ -329,6 +307,26 @@ index 8886de7..4d91cc4 100644
 +    timeout: Duration,
 +) -> Result<()> {
 +    let gcov_config = config.gcov.as_ref().unwrap();
++
++    let home_dir = env::var_os("HOME")
++        .or_else(|| env::var_os("USERPROFILE"))
++        .map(PathBuf::from)
++        .unwrap();
++
++    let cargo_grcov = home_dir.join(".cargo").join("bin").join("grcov");
++    if !cargo_grcov.exists() {
++        return Err(anyhow!("grcov not found in $HOME/.cargo/bin folder"));
++    }
++
++    let grcov_args = [
++        "-t",
++        "lcov",
++        "--branch",
++        "--ignore-not-existing",
++        "-s",
++        gcov_config.src_dir.to_str().unwrap(),
++        gcov_config.src_dir.to_str().unwrap(),
++    ];
 +
 +    let mut cov_tmp_file = tempfile::NamedTempFile::new().unwrap();
 +    log::debug!(
@@ -348,7 +346,7 @@ index 8886de7..4d91cc4 100644
 +    source.start().expect("Failed to start source");
 +    let _pp = source.get_patchpoints()?;
 +
-+    for entry in queue.iter().sorted_by_key(|q| q.id().0) {
++    for (idx, entry) in queue.iter().sorted_by_key(|q| q.id().0).enumerate() {
 +        if exit_requested.load(atomic::Ordering::SeqCst) {
 +            break;
 +        }
@@ -360,49 +358,101 @@ index 8886de7..4d91cc4 100644
 +        }
 +        source.sync_mutations()?;
 +
-+        let pid = unsafe {
-+            let pid = libc::fork();
-+            if pid == 0 {
-+                // is child
-+                let argv: Vec<CString> = config
-+                    .sink
-+                    .arguments
-+                    .iter()
-+                    .map(|arg| CString::new(arg.to_owned()).unwrap())
-+                    .collect();
-+                let bin_path = gcov_config.bin_path.to_str().unwrap();
-+                log::debug!(
-+                    "Executing command line: {} {:#?}",
-+                    bin_path,
-+                    argv
-+                );
-+                let bin = CString::new(bin_path).unwrap();
++        let pid = unsafe { fork() };
 +
-+                let envs: Vec<CString> = config
-+                    .gcov
-+                    .as_ref()
-+                    .unwrap()
-+                    .env
-+                    .iter()
-+                    .map(|e| CString::new(format!("{}={}", e.0, e.1)).unwrap())
-+                    .collect();
-+                log::debug!("Environments: {:#?}", envs);
-+                if let Err(e) = execve(&bin, &argv, &envs) {
-+                    log::error!("Error in executing execve: {:#?}", e);
-+                    let error = std::io::Error::last_os_error();
-+                    log::error!("Last os error: {:#?}", error);
-+                    std::process::exit(1);
-+                }
-+                unreachable!("unreachable: execve returns");
-+            } else if pid > 0 {
-+                // is parent
-+            } else {
-+                // pid < 0
-+                return Err(anyhow!("Fork failed!"));
++        if pid == 0 {
++            let dev_null_fd = unsafe {
++                let path = CString::new("/dev/null".as_bytes()).unwrap();
++                libc::open(path.as_ptr(), libc::O_RDONLY)
++            };
++            if dev_null_fd < 0 {
++                panic!("Failed to open /dev/null");
 +            }
 +
-+            pid
-+        };
++            let mut sink_workdir = config.general.work_dir.to_owned();
++            sink_workdir.push("0-gcov");
++            sink_workdir.push("sink");
++            sink_workdir.push("workdir");
++
++            if !sink_workdir.exists() {
++                fs::create_dir_all(&sink_workdir).expect("Failed to create sink workdir");
++            }
++
++            if config.sink.log_stdout {
++                let mut path = sink_workdir.to_owned();
++                path.push("stdout");
++                let file = OpenOptions::new()
++                    .read(true)
++                    .write(true)
++                    .create(true)
++                    .truncate(true)
++                    .open(&path)
++                    .unwrap();
++                let fd = file.as_raw_fd();
++                unsafe {
++                    libc::dup2(fd, libc::STDOUT_FILENO);
++                    libc::close(fd);
++                }
++            } else {
++                unsafe {
++                    libc::dup2(dev_null_fd, libc::STDOUT_FILENO);
++                }
++            }
++
++            if config.sink.log_stderr {
++                let mut path = sink_workdir.to_owned();
++                path.push("stderr");
++                let file = OpenOptions::new()
++                    .read(true)
++                    .write(true)
++                    .create(true)
++                    .truncate(true)
++                    .open(&path)
++                    .unwrap();
++                let fd = file.as_raw_fd();
++                unsafe {
++                    libc::dup2(fd, libc::STDERR_FILENO);
++                    libc::close(fd);
++                }
++            } else {
++                unsafe {
++                    libc::dup2(dev_null_fd, libc::STDERR_FILENO);
++                }
++            }
++
++            // is child
++            let argv: Vec<CString> = config
++                .sink
++                .arguments
++                .iter()
++                .map(|arg| CString::new(arg.to_owned()).unwrap())
++                .collect();
++            let bin_path = gcov_config.bin_path.to_str().unwrap();
++            log::trace!("Executing command line: {} {:#?}", bin_path, argv);
++            let bin = CString::new(bin_path).unwrap();
++
++            let envs: Vec<CString> = config
++                .gcov
++                .as_ref()
++                .unwrap()
++                .env
++                .iter()
++                .map(|e| CString::new(format!("{}={}", e.0, e.1)).unwrap())
++                .collect();
++            log::trace!("Environments: {:#?}", envs);
++            if let Err(e) = execve(&bin, &argv, &envs) {
++                log::error!("Error in executing execve: {:#?}", e);
++                let error = std::io::Error::last_os_error();
++                log::error!("Last os error: {:#?}", error);
++                std::process::exit(1);
++            }
++            unreachable!("unreachable: execve returns");
++        } else if pid > 0 {
++            // is parent
++        } else {
++            // pid < 0
++            return Err(anyhow!("Fork failed!"));
++        }
 +
 +        log::debug!("Target pid: {pid}");
 +
@@ -419,44 +469,58 @@ index 8886de7..4d91cc4 100644
 +        let _ = nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), nix::sys::signal::SIGTERM);
 +        source.wait_for_child_termination(timeout, true)?;
 +
-+        // Collect gcov results
-+
-+        let mut gcovr = Command::new("gcovr")
-+            .args(["-r", gcov_config.src_dir.to_str().unwrap(), "-s"])
++        let grcov_output = Command::new(cargo_grcov.to_owned())
++            .args(grcov_args)
 +            .stdout(Stdio::piped())
 +            .spawn()
-+            .unwrap();
++            .map_err(|e| {
++                anyhow!(
++                    "Error in spawning: grcov {:#?}, caused by: {:#?}",
++                    grcov_args,
++                    e
++                )
++            })?
++            .stdout
++            .expect("Grcov process returns empty");
 +
-+        let mut grep = Command::new("grep")
-+            .arg("[lb][a-z]*:")
-+            .stdin(Stdio::from(gcovr.stdout.take().unwrap()))
-+            .stdout(Stdio::piped())
-+            .spawn()
-+            .unwrap();
++        let mut lines_found = 0;
++        let mut lines_hit = 0;
++        let mut branches_found = 0;
++        let mut branches_hit = 0;
 +
-+        grep.wait().unwrap();
-+
-+        let mut l_per = String::new();
-+        let mut l_abs = String::new();
-+        let mut b_per = String::new();
-+        let mut b_abs = String::new();
-+        let reader = BufReader::new(grep.stdout.unwrap());
++        let reader = BufReader::new(grcov_output);
 +        for line in reader.lines() {
 +            let line = line?;
-+            if line.starts_with("lines:") {
-+                let parts: Vec<&str> = line.split_whitespace().collect();
-+                if parts.len() >= 3 {
-+                    l_per = parts[1].trim_end_matches('%').to_string();
-+                    l_abs = parts[2].trim_start_matches('(').to_string();
-+                }
-+            } else if line.starts_with("branches:") {
-+                let parts: Vec<&str> = line.split_whitespace().collect();
-+                if parts.len() >= 3 {
-+                    b_per = parts[1].trim_end_matches('%').to_string();
-+                    b_abs = parts[2].trim_start_matches('(').to_string();
-+                }
++            let parts: Vec<&str> = line.split(':').collect();
++
++            match parts[0] {
++                "LF" => lines_found += parts[1].parse::<u64>().unwrap_or(0),
++                "LH" => lines_hit += parts[1].parse::<u64>().unwrap_or(0),
++                "BRF" => branches_found += parts[1].parse::<u64>().unwrap_or(0),
++                "BRH" => branches_hit += parts[1].parse::<u64>().unwrap_or(0),
++                _ => {} // Ignore other lines
 +            }
 +        }
++
++        // Compute line coverage ratio
++        let l_per = if lines_found > 0 {
++            (lines_hit as f64 / lines_found as f64) * 100.0
++        } else {
++            0.0
++        };
++
++        // Compute branch coverage ratio
++        let b_per = if branches_found > 0 {
++            (branches_hit as f64 / branches_found as f64) * 100.0
++        } else {
++            0.0
++        };
++
++        // Format the absolute values and percentages
++        let l_abs = lines_hit;
++        let b_abs = branches_hit;
++        let l_per = format!("{:.4}", l_per);
++        let b_per = format!("{:.4}", b_per);
 +
 +        cov_tmp_file
 +            .write_all(format!("{ts},{l_abs},{l_per},{b_abs},{b_per}\n").as_bytes())
@@ -464,6 +528,10 @@ index 8886de7..4d91cc4 100644
 +        cov_tmp_file.flush().unwrap();
 +
 +        log::info!("Coverage:\nLine:\t{l_abs}({l_per}%)\nBranch:\t{b_abs}({b_per}%)");
++        log::info!(
++            "Finished measuring coverage of the {idx}-th queue entry, progress: {:.2}%",
++            idx as f64 / queue.len() as f64 * 100f64
++        );
 +    }
 +
 +    cov_tmp_file
@@ -476,7 +544,7 @@ index 8886de7..4d91cc4 100644
  pub fn compute_llvm_cov(
      config: &Config,
      exit_requested: Arc<AtomicBool>,
-@@ -183,3 +338,62 @@ pub fn compute_llvm_cov(
+@@ -183,3 +432,62 @@ pub fn compute_llvm_cov(
  
      Ok(())
  }
@@ -539,19 +607,6 @@ index 8886de7..4d91cc4 100644
 +    }
 +    Ok(false)
 +}
-diff --git a/scheduler/src/fuzzer/worker_impl/common.rs b/scheduler/src/fuzzer/worker_impl/common.rs
-index 2a8a1b5..a4a1ecf 100644
---- a/scheduler/src/fuzzer/worker_impl/common.rs
-+++ b/scheduler/src/fuzzer/worker_impl/common.rs
-@@ -217,7 +217,7 @@ impl FuzzingWorker {
- fn symbolize_report(report: String) -> String {
-     let mut cmd = Command::new("python3");
-     cmd.args([
--        "/home/user/fuzztruction/lib/asan_symbolize.py",
-+        "/home/zdk/Workspace/fuzztruction-net/lib/asan_symbolize.py",
-         "--demangle",
-     ]);
-     cmd.stdin(Stdio::piped());
 diff --git a/scheduler/src/fuzzer/worker_impl/init.rs b/scheduler/src/fuzzer/worker_impl/init.rs
 index 728d127..a2d288b 100644
 --- a/scheduler/src/fuzzer/worker_impl/init.rs
