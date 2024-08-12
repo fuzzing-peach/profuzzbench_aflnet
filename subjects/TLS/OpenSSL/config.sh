@@ -190,7 +190,7 @@ function run_ft {
     # collecting coverage results
     sudo ${HOME}/fuzztruction-net/target/release/fuzztruction ft.yaml gcov -t 3s
 
-    sudo chmod -R 644 $work_dir
+    sudo chmod -R 755 $work_dir
 
     tar -zcvf output.tar.gz $work_dir
 
