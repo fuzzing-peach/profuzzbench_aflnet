@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -eu
-
 function checkout {
     mkdir -p repo
     git clone https://gitee.com/sz_abundance/openssl.git repo/openssl
@@ -192,14 +190,16 @@ function run_ft {
     # collecting coverage results
     sudo ${HOME}/fuzztruction-net/target/release/fuzztruction ft.yaml gcov -t 3s
 
+    sudo chmod -R 644 $work_dir
+
     tar -zcvf output.tar.gz $work_dir
 
     popd >/dev/null
 }
 
 function build_gcov {
-    mkdir -p target/gcov
-    rm -rf target/gcov/*
+    mkdir -p target/gcov/consumer
+    rm -rf target/gcov/consumer/*
     cp -r repo/openssl target/gcov/consumer/openssl
     pushd target/gcov/consumer/openssl >/dev/null
 
