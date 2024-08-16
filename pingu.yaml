@@ -1,0 +1,6 @@
+work-directory: "WORK-DIRECTORY"
+input-directory: "/home/user/profuzzbench/no-inputs"
+jail-uid: UID
+jail-gid: GID
+timeout: 1s
+target-port: 4433

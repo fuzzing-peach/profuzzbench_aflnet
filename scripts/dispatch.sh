@@ -52,8 +52,29 @@ deps)
     ;;
 pingu)
     # Pingu is the name of my fuzzer :)
-    source $target_config
-    in_subshell "$cmd"_pingu "$@"
+    if [[ "$cmd" == "build" ]]; then
+        (
+            # build consumer
+            source $target_config
+            # ignore the ${GENERATOR}
+            in_subshell build_pingu_consumer "${@:2}"
+        )
+        (
+            # build generator
+            if [[ -n $1 ]]; then
+                generator=${target%/*}/$1
+            else
+                generator=${target}
+            fi
+            source "subjects/$generator/config.sh"
+            in_subshell build_pingu_generator "${@:2}"
+        )
+    else
+        # run generator-consumer
+        source $target_config
+        # run_pingu $timeout $generator
+        in_subshell run_pingu "$@"
+    fi
     ;;
 ft)
     # FT-Net: https://github.com/fuzztruction/fuzztruction-net
