@@ -1,5 +1,22 @@
-# ProFuzzBench - A Benchmark for Stateful Protocol Fuzzing
-ProFuzzBench is a benchmark for stateful fuzzing of network protocols. It includes a suite of representative open-source network servers for popular protocols (e.g., TLS, SSH, SMTP, FTP, SIP), and tools to automate experimentation.
+# PinguFuzzBench - A Benchmark for Cryptographic Network Protocol Fuzzing
+
+> [!NOTE] 
+> **PINGU** is the abbreviation of cryptogra**P**hc network**ING** comm**U**nication protocols :)
+
+PinguFuzzBench is a benchmark for the fuzzing of cryptographic network protocols. It is a specialized version of ProFuzzbench, which has removed some of the plaintext transmission network protocols from ProFuzzbench and added multiple encrypted network protocols (including TLS, SSH, QUIC, DTLS).
+
+# Progress
+***
+
+| Protocol     | **Pingu** | AFLNet | StateAFL | SGFuzz | FT-Net | tlspuffin | tlsfuzzer | tls-anvil |
+| ------------ | --------- | ------ | -------- | ------ | ------ | --------- | --------- | --------- |
+| TLS/OpenSSL  | ⌛         | ✅      | ⌛        |        |        | ✅         |           |           |
+| TLS/WolfSSL  |           |        |          |        |        |           |           |           |
+| SSH/OpenSSH  |           |        |          |        |        |           |           |           |
+| QUIC/OpenSSL |           |        |          |        |        |           |           |           |
+| DTLS/OpenSSL |           |        |          |        |        |           |           |           |
+
+# Citing PinguFuzzBench
 
 # Citing ProFuzzBench
 
