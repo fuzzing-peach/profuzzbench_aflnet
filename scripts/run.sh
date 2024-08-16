@@ -63,6 +63,11 @@ if [[ -n "$generator" && "$fuzzer" != "ft" && "$fuzzer" != "pingu" ]]; then
     exit 1
 fi
 
+if [[ -z "$version" ]]; then
+    log_error "[!] --version is required"
+    exit 1
+fi
+
 times=${times:-"1"}
 protocol=${target%/*}
 impl=${target##*/}
@@ -86,7 +91,7 @@ fi
 log_success "[+] Ready to launch image: $image_id"
 cids=()
 for i in $(seq 1 $times); do
-    cmd="docker run -it \
+    cmd="docker run -it -d \
         --cap-add=SYS_ADMIN --cap-add=SYS_RAWIO --cap-add=SYS_PTRACE \
         --security-opt seccomp=unconfined \
         --security-opt apparmor=unconfined \
@@ -111,16 +116,18 @@ done
 # wait until all these dockers are stopped
 log_success "[+] Fuzzing in progress ..."
 log_success "[+] Waiting for the following containers to stop: ${dlist}"
-docker wait ${dlist} >/dev/null
+docker wait $dlist >/dev/null
 
 index=1
 for id in ${cids[@]}; do
     log_success "[+] Pulling fuzzing results from ${id}"
     ts=$(date +%s)
-    docker cp ${id}:/home/user/target/${fuzzer}/output.tar.gz ${output}/out-${fuzzer}-${protocol}-${impl}-${impl_version}-${index}-${ts}.tar.gz >/dev/null
+    out_file="${output}/out-${fuzzer}-${protocol}-${impl}-${version}-${index}-${ts}.tar.gz"
+    docker cp ${id}:/home/user/target/${fuzzer}/output.tar.gz $out_file >/dev/null
     if [ ! -z "$cleanup" ]; then
         docker rm ${id} >/dev/null
         log_success "[+] Container $id deleted"
     fi
+    log_success "[+] Fuzzing results pulled to $out_file"
     index=$((index+1))
 done

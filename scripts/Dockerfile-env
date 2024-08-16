@@ -24,6 +24,7 @@ RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.l
 # RUN echo deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main >> /etc/apt/sources.list
 # RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 
+# TODO: 精简安装包
 # Install common dependencies
 ENV DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/var/lib/apt \
@@ -87,12 +88,13 @@ ENV RUSTUP_DIST_SERVER=https://rsproxy.cn
 ENV RUSTUP_UPDATE_ROOT=https://rsproxy.cn/rustup
 RUN --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
     --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain stable
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y --default-toolchain stable && \
+    ${HOME}/.cargo/bin/cargo install grcov && \
+    sudo cp ${HOME}/.cargo/bin/grcov /usr/local/bin/
 COPY scripts/cargo.toml ${HOME}/.cargo/
 COPY scripts/.zshrc ${HOME}/.zshrc
 COPY scripts/.p10k.zsh ${HOME}/.p10k.zsh
 RUN zsh -c ". ~/.zshrc"
-RUN ${HOME}/.cargo/bin/cargo install grcov
 ##############
 # End of user setup
 
@@ -121,8 +123,9 @@ FROM builder as ft-net-builder
 COPY patches /tmp/patches
 RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
     --mount=type=cache,target=${HOME}/.rustup,uid=${USER_ID},gid=${GROUP_ID} \
-    git clone https://github.com/fuzztruction-net/fuzztruction-net && \
+    git clone https://github.com/fuzztruction/fuzztruction-net.git && \
     cd fuzztruction-net && \
+    git checkout c34408b && \
     git apply /tmp/patches/ft.patch && \
     echo "nightly-2023-10-10" >> rust-toolchain && \
     ${HOME}/.cargo/bin/cargo build --workspace --release && \
@@ -161,7 +164,8 @@ RUN git clone https://gitee.com/skyworld123/aflnet.git && \
     git checkout 62d63a59230bb5f5c6e54cddd381b9425dba3726 && \
     git apply /tmp/patches/aflnet.patch && \
     make clean all ${MAKE_OPT} && \
-    cd llvm_mode && make ${MAKE_OPT}
+    cd llvm_mode && make ${MAKE_OPT} && \
+    rm -rf .git tutorials docs
 
 # StateAFL
 # ENV STATEAFL_CFLAGS="-DENABLE_TRACE_GLOBAL_DATA -DBLACKLIST_ALLOC_SITES -DBLACKLIST_GLOBALS"
@@ -179,7 +183,8 @@ RUN git clone https://gitee.com/zhangadiu/stateafl.git --depth=1 && \
     cd tlsh && \
     git apply /tmp/patches/tlsh.patch && \
     cd .. && \
-    make ${MAKE_OPT}
+    make ${MAKE_OPT} && \
+    rm -rf .git tutorials images docs
 
 # SGFuzz
 RUN git clone https://gitee.com/pine404/SGFuzz.git --depth=1 && \
@@ -187,7 +192,8 @@ RUN git clone https://gitee.com/pine404/SGFuzz.git --depth=1 && \
     git checkout 00dbbd70ba79f1bcff3f7dfdb4fda0645cf91225 && \
     git apply /tmp/patches/sgfuzz.patch && \
     ./build.sh && \
-    sudo cp libsfuzzer.a /usr/lib/libsFuzzer.a
+    sudo cp libsfuzzer.a /usr/lib/libsFuzzer.a && \
+    rm -rf .git examples
 
 # Install hongfuzz netdrive that is used by SGFuzz
 RUN git clone https://gitee.com/kherrisan/honggfuzz.git --depth=1 && \
@@ -195,7 +201,8 @@ RUN git clone https://gitee.com/kherrisan/honggfuzz.git --depth=1 && \
     CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address" make libhfcommon/libhfcommon.a && \
     CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address -DHFND_RECVTIME=1" make libhfnetdriver/libhfnetdriver.a && \
     sudo mv libhfcommon/libhfcommon.a /usr/lib/libhfcommon.a && \
-    sudo mv libhfnetdriver/libhfnetdriver.a /usr/lib/libhfnetdriver.a
+    sudo mv libhfnetdriver/libhfnetdriver.a /usr/lib/libhfnetdriver.a && \
+    rm -rf .git examples 
 
 # tlsfuzzer
 RUN pip3 install --break-system-packages -i https://mirrors.aliyun.com/pypi/simple --pre tlslite-ng --proxy=${HTTP_PROXY} && \
@@ -234,28 +241,15 @@ COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/fuzztruction-
 COPY --from=ft-net-builder ${HOME}/fuzztruction-net/generator/pass/mem_functions.ll ${HOME}/fuzztruction-net/generator/pass/mem_functions.ll
 COPY --from=ft-net-builder ${HOME}/fuzztruction-net/env/check_env.sh /usr/bin/
 COPY --from=ft-net-builder ${HOME}/fuzztruction-net/fuzztruction-experiments ${HOME}/fuzztruction-net/fuzztruction-experiments
-RUN sudo touch "/etc/ld.so.conf.d/ft-net.conf" && \
-    echo "${HOME}/fuzztruction-net/target/debug" | sudo tee -a "/etc/ld.so.conf.d/ft-net.conf" && \
-    echo "${HOME}/fuzztruction-net/target/release" | sudo tee -a "/etc/ld.so.conf.d/ft-net.conf" && \
-    sudo ldconfig
 
 # Copy pingu artifact
 RUN mkdir -p ${HOME}/pingu/target/debug/
 COPY --from=pingu-builder ${HOME}/pingu/target/debug/pingu ${HOME}/pingu/target/debug/pingu
 COPY --from=pingu-builder ${HOME}/pingu/target/debug/libfake_random.so ${HOME}/pingu/target/debug/libfake_random.so
-# TODO: copy artifact in the directory generator/pass
-RUN sudo touch "/etc/ld.so.conf.d/pingu.conf" && \
-    echo "${HOME}/pingu/target/debug" | sudo tee "/etc/ld.so.conf.d/pingu.conf" && \
-    sudo ldconfig
 
 # Copy TLS-Anvil artifact
 RUN mkdir -p ${HOME}/TLS-Anvil/TLS-Testsuite/
 COPY --from=tlsanvil-builder ${HOME}/TLS-Anvil/TLS-Testsuite/apps ${HOME}/TLS-Anvil/TLS-Testsuite/apps
-
-# TODO: Copy profuzzbench folder to the container
-
-# COPY --chown=user:user . ${HOME}/profuzzbench
-# RUN sudo chmod +x ${HOME}/profuzzbench/scripts/*.sh 
 
 # Build libgcov_preload.so
 COPY scripts/gcov_preload.c gcov_preload.c

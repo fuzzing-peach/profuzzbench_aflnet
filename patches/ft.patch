@@ -261,7 +261,7 @@ index 036e283..cde3028 100644
          config.validate()?;
          Ok(config)
 diff --git a/scheduler/src/coverage/networked.rs b/scheduler/src/coverage/networked.rs
-index 8886de7..9ec7328 100644
+index 8886de7..2c6fdaf 100644
 --- a/scheduler/src/coverage/networked.rs
 +++ b/scheduler/src/coverage/networked.rs
 @@ -1,11 +1,17 @@
@@ -297,7 +297,7 @@ index 8886de7..9ec7328 100644
  
  unsafe fn load_mutations(source: &mut Source, entry: &QueueEntry) -> Result<()> {
      let mutations = entry.mutations();
-@@ -39,6 +48,246 @@ unsafe fn load_mutations(source: &mut Source, entry: &QueueEntry) -> Result<()>
+@@ -39,6 +48,253 @@ unsafe fn load_mutations(source: &mut Source, entry: &QueueEntry) -> Result<()>
      Ok(())
  }
  
@@ -313,9 +313,16 @@ index 8886de7..9ec7328 100644
 +        .map(PathBuf::from)
 +        .unwrap();
 +
-+    let cargo_grcov = home_dir.join(".cargo").join("bin").join("grcov");
-+    if !cargo_grcov.exists() {
-+        return Err(anyhow!("grcov not found in $HOME/.cargo/bin folder"));
++    let cargo_grcov = Command::new("which")
++        .arg("grcov")
++        .output()
++        .map_err(|e| anyhow!("Failed to find grcov: {}", e))?;
++    let cargo_grcov = String::from_utf8(cargo_grcov.stdout)
++        .map_err(|e| anyhow!("Invalid UTF-8 sequence: {}", e))?
++        .trim()
++        .to_string();
++    if cargo_grcov.is_empty() {
++        return Err(anyhow!("grcov not found in PATH"));
 +    }
 +
 +    let grcov_args = [
@@ -544,7 +551,7 @@ index 8886de7..9ec7328 100644
  pub fn compute_llvm_cov(
      config: &Config,
      exit_requested: Arc<AtomicBool>,
-@@ -183,3 +432,62 @@ pub fn compute_llvm_cov(
+@@ -183,3 +439,62 @@ pub fn compute_llvm_cov(
  
      Ok(())
  }
