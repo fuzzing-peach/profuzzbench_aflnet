@@ -1,12 +1,11 @@
 source:
-  bin-path: "/home/user/target/ft/generator/wolfssl/examples/client/client"
+  bin-path: "/home/user/target/pingu/generator/wolfssl/examples/client/client"
   env:
     - LD_PRELOAD: "libfake_random.so"
     - FAKE_RANDOM: "1"
   arguments: ["-p", "4433", "-A", "/home/user/profuzzbench/lets-encrypt-r3.pem"]
-  working-dir: "/home/user/target/ft/generator/wolfssl"
-  input-type: Tcp
-  output-type: Tcp
-  is-server: false
+  cwd: "/home/user/target/pingu/generator/wolfssl"
+  input-type: stdin
+  output-type: socket
   log-stdout: true
   log-stderr: true

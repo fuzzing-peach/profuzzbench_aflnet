@@ -1,8 +1,5 @@
 sink:
-  bin-path: "/home/user/target/ft/consumer/wolfssl/examples/server/server"
-  env:
-    - LD_PRELOAD: "libfake_random.so"
-    - FAKE_RANDOM: "1"
+  bin-path: "/home/user/target/pingu/consumer/wolfssl/examples/server/server"
   arguments:
     [
       "-p",
@@ -11,16 +8,17 @@ sink:
       "/home/user/profuzzbench/test.fullchain.pem",
       "-k",
       "/home/user/profuzzbench/test.key.pem",
-      "-e",
+      "-e"
     ]
-  working-dir: "/home/user/target/ft/consumer/wolfssl/"
-  input-type: Tcp
-  output-type: Tcp
-  is-server: true
-  server-port: "4433"
+  cwd: "/home/user/target/pingu/consumer/wolfssl"
+  input-type: socket
+  output-type: stdout
   log-stdout: true
   log-stderr: true
-  allow-unstable-sink: false
+  allow-unstable-sink: true
+  env:  
+    - LD_PRELOAD: "libfake_random.so"
+    - FAKE_RANDOM: "1"
 
 gcov:
   bin-path: "/home/user/target/gcov/consumer/wolfssl/examples/server/server"

@@ -13,7 +13,6 @@ sink:
       "/home/user/profuzzbench/test.fullchain.pem",
       "-accept",
       "4433",
-      "-www",
       "-naccept",
       "1",
       "-4"
@@ -24,7 +23,7 @@ sink:
   server-port: "4433"
   log-stdout: true
   log-stderr: true
-  allow-unstable-sink: true
+  allow-unstable-sink: false
 
 gcov:
   bin-path: "/home/user/target/gcov/consumer/openssl/apps/openssl"
