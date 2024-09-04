@@ -18,6 +18,12 @@ PinguFuzzBench is a benchmark for the fuzzing of cryptographic network protocols
 
 
 # Folder structure
+
+<p align="center">
+  <img src="docs/pingubench.drawio.svg" alt="pingufuzzbench-structure">
+</p>
+
+
 ```
 pingu-fuzzbench-folder
 ├── subjects: this folder contains all the different protocols included in this benchmark and
