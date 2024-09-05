@@ -8,13 +8,15 @@ PinguFuzzBench is a benchmark for the fuzzing of cryptographic network protocols
 # Progress
 ***
 
-| Protocol                            | **Pingu** | AFLNet | StateAFL | SGFuzz | FT-Net | tlspuffin | tlsfuzzer | tls-anvil |
-| ----------------------------------- | --------- | ------ | -------- | ------ | ------ | --------- | --------- | --------- |
-| [TLS/OpenSSL](subjects/TLS/OpenSSL) | ✅         | ✅      | ⌛        |        | ⌛      |           |           |           |
-| [TLS/WolfSSL](subjects/TLS/WolfSSL) |           |        |          |        |        |           |           |           |
-| SSH/OpenSSH                         |           |        |          |        |        |           |           |           |
-| QUIC/OpenSSL                        |           |        |          |        |        |           |           |           |
-| DTLS/OpenSSL                        |           |        |          |        |        |           |           |           |
+| Protocol                              | **Pingu** | AFLNet | StateAFL | SGFuzz | FT-Net | tlspuffin | tlsfuzzer | tls-anvil |
+| ------------------------------------- | --------- | ------ | -------- | ------ | ------ | --------- | --------- | --------- |
+| [TLS/OpenSSL](subjects/TLS/OpenSSL)   | ✅         | ✅      |          |        | ✅      |           |           |           |
+| [TLS/WolfSSL](subjects/TLS/WolfSSL)   | ✅         | ✅      |          |        | ✅      |           |           |           |
+| [TLS/LibreSSL](subjects/TLS/LibreSSL) |           |        |          |        |        |           |           |           |
+| [TLS/GnuTLS](subjects/TLS/GnuTLS)     |           |        |          |        |        |           |           |           |
+| SSH/OpenSSH                           |           |        |          |        |        |           |           |           |
+| QUIC/OpenSSL                          |           |        |          |        |        |           |           |           |
+| DTLS/OpenSSL                          |           |        |          |        |        |           |           |           |
 
 
 # Folder structure
