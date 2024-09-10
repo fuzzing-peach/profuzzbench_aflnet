@@ -1,9 +1,5 @@
 sink:
   bin-path: "/home/user/target/ft/consumer/openssl/apps/openssl"
-  env:
-    - LD_LIBRARY_PATH: "/home/user/target/ft/consumer/openssl"
-    - LD_PRELOAD: "libfake_random.so"
-    - FAKE_RANDOM: "1"
   arguments:
     [
       "s_server",
@@ -28,7 +24,6 @@ sink:
 gcov:
   bin-path: "/home/user/target/gcov/consumer/openssl/apps/openssl"
   env:
-    - LD_LIBRARY_PATH: "/home/user/target/gcov/consumer/openssl/apps/openssl"
-    - LD_PRELOAD: "libfake_random.so:libgcov_preload.so"
-    - FAKE_RANDOM: "1"
+    - LD_PRELOAD: "libgcov_preload.so"
   src-dir: "/home/user/target/gcov/consumer/openssl"
+  reporter: grcov

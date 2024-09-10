@@ -1,7 +1,6 @@
 # FT-Net: https://github.com/fuzztruction-net/fuzztruction-net
 FROM nbars/fuzztruction-llvm_debug:llvmorg-17.0.6 as llvm
 
-# ubuntu:22.04 
 FROM ubuntu:23.04 as builder
 
 ARG HTTP_PROXY
@@ -12,8 +11,11 @@ ENV HTTPS_PROXY=${HTTPS_PROXY}
 ENV http_proxy=${HTTP_PROXY}
 ENV https_proxy=${HTTP_PROXY}
 
-ARG MAKE_OPT="-j"
+ARG MAKE_OPT="-j8"
 ENV MAKE_OPT=${MAKE_OPT}
+
+ARG CARGO_BUILD_JOBS="8"
+ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
 
 # Change the Ubuntu package mirror
 RUN apt update && apt install -y apt-transport-https ca-certificates
@@ -35,12 +37,12 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/var/lib/
     openssh-server openssl libssl-dev libgnutls28-dev \
     libcap-dev libpcap-dev tcpdump \
     rsync autopoint gperf texinfo gettext \
-    python3 python3-pip python3-dev python3-setuptools python-is-python3 openjdk-11-jdk \
+    openjdk-11-jdk \
     vim nano screen htop man wget httpie bash-completion ripgrep iputils-ping iproute2 telnet net-tools ncat netcat-traditional \
-    zsh autojump fzf \
-    && rm -rf /var/lib/apt/lists
+    zsh autojump fzf
 
-RUN pip3 install --break-system-packages -i https://mirrors.aliyun.com/pypi/simple gcovr
+RUN pip3 install --break-system-packages -i https://mirrors.aliyun.com/pypi/simple --proxy=${HTTP_PROXY} \
+    gcovr
 
 # Copy prebuilt custom LLVM version
 COPY --from=llvm /llvm/* /usr
@@ -115,8 +117,11 @@ RUN --mount=type=cache,target=${HOME}/.cargo,uid=${USER_ID},gid=${GROUP_ID} \
     git submodule update --init && \
     cd fuzztruction && \
     git submodule update --init && \
-    cd ../pingu-fuzzer && \
-    ${HOME}/.cargo/bin/cargo build
+    cd .. && \
+    ${HOME}/.cargo/bin/cargo build -p pingu-fuzzer -p pingu-cc && \
+    ${HOME}/.cargo/bin/cargo build --manifest-path ${HOME}/pingu/fuzztruction/generator/agent/Cargo.toml
+RUN mkdir -p ${HOME}/libafl_cc_tmp && \
+    cp -r ${HOME}/pingu/target/debug/build/libafl_cc* ${HOME}/libafl_cc_tmp
 
 # FT-Net
 FROM builder as ft-net-builder
@@ -148,8 +153,16 @@ RUN --mount=type=cache,target=${HOME}/.git,uid=${USER_ID},gid=${GROUP_ID} \
     git checkout v1.2.9 && \
     mvn install -DskipTests -Dspotless.apply.skip -DproxySet=true -DproxyHost=${PROXY_HOST} -DproxyPort=${PROXY_PORT}
 
+FROM builder as faketime-builder
+RUN git clone https://gitee.com/kherrisan/libfaketime.git && \
+    cd libfaketime && \
+    make -j
+
 # build the final image
 FROM builder
+
+RUN sudo ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" | sudo tee /etc/timezone
 
 COPY patches /tmp/patches
 
@@ -169,7 +182,7 @@ RUN git clone https://gitee.com/skyworld123/aflnet.git && \
 
 # StateAFL
 # ENV STATEAFL_CFLAGS="-DENABLE_TRACE_GLOBAL_DATA -DBLACKLIST_ALLOC_SITES -DBLACKLIST_GLOBALS"
-RUN sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y tshark && sudo pip3 install --proxy=${HTTP_PROXY} --break-system-packages -i https://mirrors.aliyun.com/pypi/simple pyshark
+RUN sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y tshark
 RUN git clone https://gitee.com/zhangadiu/stateafl.git --depth=1 && \
     cd stateafl && \
     git checkout d923e22f7b2688db45b08f3fa3a29a566e7ff3a4 && \
@@ -225,6 +238,11 @@ RUN cd /tmp && \
     wget https://github.com/rr-debugger/rr/releases/download/5.7.0/rr-5.7.0-Linux-$(uname -m).deb && \
     sudo dpkg -i rr-5.7.0-Linux-$(uname -m).deb
 
+# Copy libfaketime artifact
+COPY --from=faketime-builder ${HOME}/libfaketime/src/libfaketime.so.1 ${HOME}/libfaketime.so.1
+COPY --from=faketime-builder ${HOME}/libfaketime/src/libfaketimeMT.so.1 ${HOME}/libfaketimeMT.so.1
+COPY --from=faketime-builder ${HOME}/libfaketime/src/faketime* ${HOME}/faketime*
+
 # Copy FT-Net artifact
 RUN mkdir -p ${HOME}/fuzztruction-net/target/release/ && \
     mkdir -p ${HOME}/fuzztruction-net/target/debug/ && \
@@ -243,9 +261,23 @@ COPY --from=ft-net-builder ${HOME}/fuzztruction-net/env/check_env.sh /usr/bin/
 COPY --from=ft-net-builder ${HOME}/fuzztruction-net/fuzztruction-experiments ${HOME}/fuzztruction-net/fuzztruction-experiments
 
 # Copy pingu artifact
-RUN mkdir -p ${HOME}/pingu/target/debug/
+RUN mkdir -p ${HOME}/pingu/target/debug/ && \
+    mkdir -p ${HOME}/pingu/fuzztruction/generator/pass/ && \
+    mkdir -p ${HOME}/pingu/fuzztruction/target/debug/ && \
+    mkdir -p ${HOME}/pingu/fuzztruction/target/debug/build
 COPY --from=pingu-builder ${HOME}/pingu/target/debug/pingu ${HOME}/pingu/target/debug/pingu
-COPY --from=pingu-builder ${HOME}/pingu/target/debug/libfake_random.so ${HOME}/pingu/target/debug/libfake_random.so
+COPY --from=pingu-builder ${HOME}/libafl_cc_tmp ${HOME}/pingu/target/debug/build/
+COPY --from=pingu-builder ${HOME}/pingu/target/debug/grcov-all ${HOME}/pingu/target/debug/grcov-all
+COPY --from=pingu-builder ${HOME}/pingu/target/debug/libafl_cc ${HOME}/pingu/target/debug/libafl_cc
+COPY --from=pingu-builder ${HOME}/pingu/target/debug/libafl_cxx ${HOME}/pingu/target/debug/libafl_cxx
+COPY --from=pingu-builder ${HOME}/pingu/target/debug/libpingu_sink_agent.a ${HOME}/pingu/target/debug/libpingu_sink_agent.a
+COPY --from=pingu-builder ${HOME}/pingu/target/debug/libfake_random.so ${HOME}/libfake_random.so
+COPY --from=pingu-builder ${HOME}/pingu/fuzztruction/target/debug/libpingu_generator.so ${HOME}/pingu/fuzztruction/target/debug/libpingu_generator.so
+COPY --from=pingu-builder ${HOME}/pingu/fuzztruction/generator/pass/fuzztruction-source-clang-fast ${HOME}/pingu/fuzztruction/generator/pass/fuzztruction-source-clang-fast
+COPY --from=pingu-builder ${HOME}/pingu/fuzztruction/generator/pass/fuzztruction-source-clang-fast++ ${HOME}/pingu/fuzztruction/generator/pass/fuzztruction-source-clang-fast++
+COPY --from=pingu-builder ${HOME}/pingu/fuzztruction/generator/pass/fuzztruction-source-llvm-pass.so ${HOME}/pingu/fuzztruction/generator/pass/fuzztruction-source-llvm-pass.so
+COPY --from=pingu-builder ${HOME}/pingu/fuzztruction/generator/pass/mem_functions.ll ${HOME}/pingu/fuzztruction/generator/pass/mem_functions.ll
+ENV PATH=${HOME}/pingu/target/debug/:${PATH}
 
 # Copy TLS-Anvil artifact
 RUN mkdir -p ${HOME}/TLS-Anvil/TLS-Testsuite/

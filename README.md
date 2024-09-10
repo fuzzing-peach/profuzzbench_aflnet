@@ -13,7 +13,7 @@ PinguFuzzBench is a benchmark for the fuzzing of cryptographic network protocols
 | [TLS/OpenSSL](subjects/TLS/OpenSSL)   | ✅         | ✅      |          |        | ✅      |           |           |           |
 | [TLS/WolfSSL](subjects/TLS/WolfSSL)   | ✅         | ✅      |          |        | ✅      |           |           |           |
 | [TLS/LibreSSL](subjects/TLS/LibreSSL) |           |        |          |        |        |           |           |           |
-| [TLS/GnuTLS](subjects/TLS/GnuTLS)     |           |        |          |        |        |           |           |           |
+| [TLS/GnuTLS](subjects/TLS/GnuTLS)     |           |        |          |        | ✅      |           |           |           |
 | SSH/OpenSSH                           |           |        |          |        |        |           |           |           |
 | QUIC/OpenSSL                          |           |        |          |        |        |           |           |           |
 | DTLS/OpenSSL                          |           |        |          |        |        |           |           |           |

@@ -10,7 +10,7 @@ function checkout {
 }
 
 function replay {
-    # the process launching order is confusing...
+    # the process launching order is confusing.
     ${HOME}/aflnet/aflnet-replay $1 TLS 4433 100 &
     LD_PRELOAD=libgcov_preload.so:libfake_random.so FAKE_RANDOM=1 \
         timeout -k 1s 3s ./apps/openssl s_server \
@@ -18,10 +18,6 @@ function replay {
         -key ${HOME}/profuzzbench/test.key.pem \
         -accept 4433 -4
     wait
-}
-
-function install_dependencies {
-    echo "No dependencies"
 }
 
 function build_aflnet {
@@ -35,8 +31,8 @@ function build_aflnet {
     # --with-rand-seed=none only will raise: entropy source strength too weak
     # mentioned by: https://github.com/openssl/openssl/issues/20841
     # see https://github.com/openssl/openssl/blob/master/INSTALL.md#seeding-the-random-generator for selectable options for --with-rand-seed=X
-    export CFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -fsanitize=address"
-    export CXXFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -fsanitize=address"
+    export CFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER"
+    export CXXFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER"
 
     ./config --with-rand-seed=devrandom enable-asan no-shared no-threads no-tests no-asm no-cached-fetch no-async
     bear -- make ${MAKE_OPT}
@@ -48,7 +44,7 @@ function build_aflnet {
 
 function run_aflnet {
     timeout=$1
-    outdir=${HOME}/target/aflnet/output
+    outdir=/tmp/fuzzing-output
     indir=${HOME}/profuzzbench/subjects/TLS/OpenSSL/in-tls
     pushd ${HOME}/target/aflnet/openssl >/dev/null
 
@@ -57,8 +53,8 @@ function run_aflnet {
 
     export AFL_SKIP_CPUFREQ=1
     export AFL_PRELOAD=libfake_random.so
-    export FAKE_RANDOM=1
-    export ASAN_OPTIONS="abort_on_error=1:symbolize=1:detect_leaks=0:handle_abort=2:handle_segv=2:handle_sigbus=2:handle_sigill=2:detect_stack_use_after_return=0:detect_odr_violation=0"
+    export FAKE_RANDOM=1 # fake_random is not working with -DFT_FUZZING enabled
+    export ASAN_OPTIONS="abort_on_error=1:symbolize=0:detect_leaks=0:handle_abort=2:handle_segv=2:handle_sigbus=2:handle_sigill=2:detect_stack_use_after_return=0:detect_odr_violation=0"
 
     timeout -k 0 --preserve-status $timeout \
         ${HOME}/aflnet/afl-fuzz -d -i $indir \
@@ -70,18 +66,17 @@ function run_aflnet {
         -accept 4433 -4
 
     list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
-    pushd ${HOME}/target/gcov/openssl >/dev/null
+    cd ${HOME}/target/gcov/consumer/openssl
     compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv
-    grcov -s . -t html . -o ${outdir}/cov_html
+    grcov --branch --threads 2 -s . -t html . -o ${outdir}/cov_html
 
-    cd ..
-    tar -zcvf ${HOME}/target/aflnet/output.tar.gz output
-
-    popd >/dev/null
     popd >/dev/null
 }
 
 function build_stateafl {
+    echo "Not implemented"
+    exit 1
+
     mkdir -p target/stateafl
     rm -rf target/stateafl/*
     cp -r repo/openssl target/stateafl/openssl
@@ -90,8 +85,8 @@ function build_stateafl {
     export AFL_SKIP_CPUFREQ=1
     export CC=${HOME}/stateafl/afl-clang-fast
     export CXX=${HOME}/stateafl/afl-clang-fast++
-    export CFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER -fsanitize=address"
-    export CXXFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER -fsanitize=address"
+    export CFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -fsanitize=address -DFT_FUZZING -DFT_CONSUMER"
+    export CXXFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -fsanitize=address -DFT_FUZZING -DFT_CONSUMER"
 
     ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async enable-asan
     bear -- make ${MAKE_OPT}
@@ -103,6 +98,82 @@ function build_stateafl {
 
 function build_sgfuzz {
     echo "Not implemented"
+}
+
+function build_ft_generator {
+    mkdir -p target/ft/generator
+    rm -rf target/ft/generator/*
+    cp -r repo/openssl target/ft/generator/openssl
+    pushd target/ft/generator/openssl >/dev/null
+
+    export FT_CALL_INJECTION=1
+    export FT_HOOK_INS=branch,load,store,select,switch
+    export CC=${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast
+    export CXX=${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast++
+    export CFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_GENERATOR"
+    export CXXFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_GENERATOR"
+    export GENERATOR_AGENT_SO_DIR="${HOME}/fuzztruction-net/target/release/"
+    export LLVM_PASS_SO="${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-llvm-pass.so"
+
+    ./config --with-rand-seed=devrandom no-shared no-tests no-threads no-asm no-cached-fetch no-async
+    LDCMD=${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast bear -- make ${MAKE_OPT}
+
+    rm -rf fuzz test .git doc
+
+    popd >/dev/null
+}
+
+function build_ft_consumer {
+    sudo cp ${HOME}/profuzzbench/scripts/ld.so.conf/ft-net.conf /etc/ld.so.conf.d/
+    sudo ldconfig
+
+    mkdir -p target/ft/consumer
+    rm -rf target/ft/consumer/*
+    cp -r repo/openssl target/ft/consumer/openssl
+    pushd target/ft/consumer/openssl >/dev/null
+
+    export AFL_PATH=${HOME}/fuzztruction-net/consumer/aflpp-consumer
+    export CC=${AFL_PATH}/afl-clang-fast
+    export CXX=${AFL_PATH}/afl-clang-fast++
+    export CFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER"
+    export CXXFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER"
+
+    ./config --with-rand-seed=devrandom enable-asan no-shared no-tests no-threads no-asm no-cached-fetch no-async
+    bear -- make ${MAKE_OPT}
+
+    rm -rf fuzz test .git doc
+
+    popd >/dev/null
+}
+
+function run_ft {
+    timeout=$1
+    consumer="OpenSSL"
+    generator=${GENERATOR:-$consumer}
+    work_dir=/tmp/fuzzing-output
+    pushd ${HOME}/target/ft/ >/dev/null
+
+    # synthesize the ft configuration yaml
+    # according to the targeted fuzzer and generated
+    temp_file=$(mktemp)
+    sed -e "s|WORK-DIRECTORY|${work_dir}|g" -e "s|UID|$(id -u)|g" -e "s|GID|$(id -g)|g" ${HOME}/profuzzbench/ft.yaml >"$temp_file"
+    cat "$temp_file" >ft.yaml
+    printf "\n" >>ft.yaml
+    rm "$temp_file"
+    cat ${HOME}/profuzzbench/subjects/TLS/${generator}/ft-source.yaml >>ft.yaml
+    cat ${HOME}/profuzzbench/subjects/TLS/${consumer}/ft-sink.yaml >>ft.yaml
+
+    # running ft-net
+    sudo ${HOME}/fuzztruction-net/target/release/fuzztruction --purge ft.yaml fuzz -t ${timeout}s
+
+    # collecting coverage results
+    sudo ${HOME}/fuzztruction-net/target/release/fuzztruction ft.yaml gcov -t 3s
+    sudo chmod -R 755 $work_dir
+    sudo chown -R $(id -u):$(id -g) $work_dir
+    cd ${HOME}/target/gcov/consumer/openssl
+    grcov --branch --threads 2 -s . -t html . -o ${work_dir}/cov_html
+
+    popd >/dev/null
 }
 
 function build_pingu_generator {
@@ -119,15 +190,16 @@ function build_pingu_generator {
     export GENERATOR_AGENT_SO_DIR="${HOME}/pingu/fuzztruction/target/debug/"
     export LLVM_PASS_SO="${HOME}/pingu/fuzztruction/generator/pass/fuzztruction-source-llvm-pass.so"
 
-    ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async
+    ./config --with-rand-seed=devrandom no-shared no-tests no-threads no-asm no-cached-fetch no-async
     make ${MAKE_OPT}
 
-    rm -rf fuzz test .git doc
+    # rm -rf fuzz test .git doc
 
     popd >/dev/null
 }
 
 function build_pingu_consumer {
+
     sudo cp ${HOME}/profuzzbench/scripts/ld.so.conf/pingu.conf /etc/ld.so.conf.d/
     sudo ldconfig
 
@@ -138,18 +210,23 @@ function build_pingu_consumer {
 
     export CC="${HOME}/pingu/target/debug/libafl_cc"
     export CXX="${HOME}/pingu/target/debug/libafl_cxx"
+    export CFLAGS="-O3 -g -DFT_FUZZING -DFT_CONSUMER"
+    export CXXFLAGS="-O3 -g -DFT_FUZZING -DFT_CONSUMER"
 
-    ./config --with-rand-seed=devrandom enable-asan no-shared no-threads no-tests no-asm no-cached-fetch no-async
+    ./config --with-rand-seed=devrandom enable-asan no-shared no-tests no-threads no-asm no-cached-fetch no-async
     make ${MAKE_OPT}
 
-    rm -rf fuzz test .git doc
+    # rm -rf fuzz test .git doc
+
+    popd >/dev/null
 }
 
 function run_pingu {
     timeout=$1
     consumer="OpenSSL"
-    generator=${2-$consumer}
-    work_dir=/tmp/pingu-${generator}-TLS-${consumer}-$(date +%s)
+    generator=${@: -1}
+    generator=${generator:-$consumer}
+    work_dir=/tmp/fuzzing-output
     pushd ${HOME}/target/pingu/ >/dev/null
 
     # synthesize the pingu configuration yaml
@@ -170,94 +247,7 @@ function run_pingu {
     sudo chmod -R 755 $work_dir
     sudo chown -R $(id -u):$(id -g) $work_dir
     cd ${HOME}/target/gcov/consumer/openssl
-    grcov -s . -t html -o ${work_dir}/cov_html .
-
-    cd /tmp
-    tar -zcvf ${HOME}/target/pingu/output.tar.gz $work_dir
-
-    popd >/dev/null
-}
-
-function build_ft_generator {
-    mkdir -p target/ft/generator
-    rm -rf target/ft/generator/*
-    cp -r repo/openssl target/ft/generator/openssl
-    pushd target/ft/generator/openssl >/dev/null
-
-    export FT_CALL_INJECTION=1
-    export FT_HOOK_INS=branch,load,store,select,switch
-    export CC=${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast
-    export CXX=${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast++
-    export CFLAGS="-O3 -g -DNDEBUG -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_GENEARTOR"
-    export CXXFLAGS="-O3 -DNDEBUG -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_GENEARTOR"
-    export GENERATOR_AGENT_SO_DIR="${HOME}/fuzztruction-net/target/release/"
-    export LLVM_PASS_SO="${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-llvm-pass.so"
-
-    ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async
-    LDCMD=${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast bear -- make ${MAKE_OPT}
-
-    rm -rf fuzz test .git doc
-
-    popd >/dev/null
-}
-
-function build_ft_consumer {
-    sudo cp ${HOME}/profuzzbench/scripts/ld.so.conf/ft-net.conf /etc/ld.so.conf.d/
-    sudo ldconfig
-
-    mkdir -p target/ft/consumer
-    rm -rf target/ft/consumer/*
-    cp -r repo/openssl target/ft/consumer/openssl
-    pushd target/ft/consumer/openssl >/dev/null
-
-    export AFL_PATH=${HOME}/fuzztruction-net/consumer/aflpp-consumer
-    export CC=${AFL_PATH}/afl-clang-fast
-    export CXX=${AFL_PATH}/afl-clang-fast++
-    export CFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER -fsanitize=address"
-    export CXXFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER -fsanitize=address"
-    # export AFL_LLVM_LAF_SPLIT_SWITCHES=1
-    # export AFL_LLVM_LAF_TRANSFORM_COMPARES=1
-    # export AFL_LLVM_LAF_SPLIT_COMPARES=1
-
-    ./config --with-rand-seed=none enable-asan no-shared no-threads no-tests no-asm no-cached-fetch no-async
-    bear -- make ${MAKE_OPT}
-
-    rm -rf fuzz test .git doc
-
-    popd >/dev/null
-}
-
-function run_ft {
-    timeout=$1
-    consumer="OpenSSL"
-    generator=${2-$consumer}
-    ts=$(date +%s)
-    work_dir=/tmp/ft-${generator}-TLS-${consumer}-${ts}
-    pushd ${HOME}/target/ft/ >/dev/null
-
-    # synthesize the ft configuration yaml
-    # according to the targeted fuzzer and generated
-    temp_file=$(mktemp)
-    sed -e "s|WORK-DIRECTORY|${work_dir}|g" -e "s|UID|$(id -u)|g" -e "s|GID|$(id -g)|g" ${HOME}/profuzzbench/ft.yaml >"$temp_file"
-    cat "$temp_file" >ft.yaml
-    printf "\n" >>ft.yaml
-    rm "$temp_file"
-    cat ${HOME}/profuzzbench/subjects/TLS/${generator}/ft-source.yaml >>ft.yaml
-    cat ${HOME}/profuzzbench/subjects/TLS/${consumer}/ft-sink.yaml >>ft.yaml
-
-    # running ft-net
-    sudo ${HOME}/fuzztruction-net/target/release/fuzztruction ft.yaml fuzz -t ${timeout}s
-
-    # collecting coverage results
-    sudo ${HOME}/fuzztruction-net/target/release/fuzztruction ft.yaml gcov -t 3s
-
-    sudo chmod -R 755 $work_dir
-    sudo chown -R $(id -u):$(id -g) $work_dir
-    cd ${HOME}/target/gcov/consumer/openssl
-    grcov -s . -t html . -o ${work_dir}/cov_html
-
-    cd /tmp
-    tar -zcvf ${HOME}/target/ft/output.tar.gz ft-${generator}-TLS-${consumer}-${ts}
+    grcov --branch --threads 2 -s . -t html -o ${work_dir}/cov_html .
 
     popd >/dev/null
 }
@@ -268,7 +258,7 @@ function build_gcov {
     cp -r repo/openssl target/gcov/consumer/openssl
     pushd target/gcov/consumer/openssl >/dev/null
 
-    export CFLAGS="-fprofile-arcs -ftest-coverage"
+    export CFLAGS="-fprofile-arcs -ftest-coverage -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER"
     export LDFLAGS="-fprofile-arcs -ftest-coverage"
 
     ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async
@@ -279,14 +269,6 @@ function build_gcov {
     popd >/dev/null
 }
 
-function build_vanilla {
-    mkdir -p target/vanilla
-    rm -rf target/vanilla/*
-    cp -r repo/openssl target/vanilla/openssl
-    pushd target/vanilla/openssl >/dev/null
-
-    ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async
-    make ${MAKE_OPT}
-
-    popd >/dev/null
+function install_dependencies {
+    echo "No dependencies"
 }

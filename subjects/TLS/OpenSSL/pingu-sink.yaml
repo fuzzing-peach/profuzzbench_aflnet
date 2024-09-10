@@ -13,15 +13,15 @@ sink:
       "1",
       "-4"
     ]
+  env:  
+    - LD_PRELOAD: "libfake_random.so"
+    - FAKE_RANDOM: "1"
   cwd: "/home/user/target/pingu/consumer/openssl"
   input-type: socket
   output-type: stdout
   log-stdout: true
   log-stderr: true
   allow-unstable-sink: true
-  env:  
-    - LD_PRELOAD: "libfake_random.so"
-    - FAKE_RANDOM: "1"
 
 gcov:
   bin-path: "/home/user/target/gcov/consumer/openssl/apps/openssl"

@@ -10,7 +10,7 @@ source scripts/utils.sh
 args=($(get_args_before_double_dash "$@"))
 fuzzer_args=$(get_args_after_double_dash "$@")
 
-opt_args=$(getopt -o o:f:t:v: -l output:,fuzzer:,generator:,target:,version:,times:,timeout:,cleanup -- "${args[@]}")
+opt_args=$(getopt -o o:f:t:v: -l output:,fuzzer:,generator:,target:,version:,times:,timeout:,cleanup,detached,dry-run -- "${args[@]}")
 if [ $? != 0 ]; then
     log_error "[!] Error in parsing shell arguments."
     exit 1
@@ -51,6 +51,14 @@ while true; do
         cleanup=1
         shift 1
         ;;
+    --detached)
+        detached=1
+        shift 1
+        ;;
+    --dry-run)
+        dry_run=1
+        shift 1
+        ;;
     *)
         # echo "Usage: run.sh -t TARGET -f FUZZER -v VERSION [--times TIMES, --timeout TIMEOUT]"
         break
@@ -66,6 +74,10 @@ fi
 if [[ -z "$version" ]]; then
     log_error "[!] --version is required"
     exit 1
+fi
+
+if [[ -z "${dry_run}" ]]; then
+    dry_run=0
 fi
 
 times=${times:-"1"}
@@ -88,23 +100,32 @@ else
     exit 1
 fi
 
+output=$(realpath "$output")
+
 log_success "[+] Ready to launch image: $image_id"
 cids=()
 for i in $(seq 1 $times); do
+    # use current ms timestamp as the id
+    ts=$(date +%s%3N)
+    cname="${container_name}-${i}-${ts}"
+    mkdir -p ${output}/${cname}
     cmd="docker run -it -d \
         --cap-add=SYS_ADMIN --cap-add=SYS_RAWIO --cap-add=SYS_PTRACE \
         --security-opt seccomp=unconfined \
         --security-opt apparmor=unconfined \
+        -v /etc/localtime:/etc/localtime:ro \
+        -v /etc/timezone:/etc/timezone:ro \
         -v .:/home/user/profuzzbench \
+        -v ${output}/${cname}:/tmp/fuzzing-output \
         --mount type=tmpfs,destination=/tmp,tmpfs-mode=777 \
         --ulimit msgqueue=2097152000 \
         --shm-size=64G \
-        --name $container_name-$i \
+        --name $cname \
         $image_name \
-        /bin/bash -c \"bash /home/user/profuzzbench/scripts/dispatch.sh $target run $fuzzer $timeout\""
-    echo "$cmd"
+        /bin/bash -c \"bash /home/user/profuzzbench/scripts/dispatch.sh $target run $fuzzer $timeout ${fuzzer_args}\""
+    echo $cmd
     id=$(eval $cmd)
-    log_success "[+] Launch docker container: $i"
+    log_success "[+] Launch docker container: ${cname}"
     cids+=(${id::12}) # store only the first 12 characters of a container ID
 done
 
@@ -116,18 +137,27 @@ done
 # wait until all these dockers are stopped
 log_success "[+] Fuzzing in progress ..."
 log_success "[+] Waiting for the following containers to stop: ${dlist}"
-docker wait $dlist >/dev/null
 
-index=1
-for id in ${cids[@]}; do
-    log_success "[+] Pulling fuzzing results from ${id}"
-    ts=$(date +%s)
-    out_file="${output}/out-${fuzzer}-${protocol}-${impl}-${version}-${index}-${ts}.tar.gz"
-    docker cp ${id}:/home/user/target/${fuzzer}/output.tar.gz $out_file >/dev/null
-    if [ ! -z "$cleanup" ]; then
-        docker rm ${id} >/dev/null
-        log_success "[+] Container $id deleted"
-    fi
-    log_success "[+] Fuzzing results pulled to $out_file"
-    index=$((index+1))
-done
+function maybe_cleanup() {
+    local index=1
+    for id in ${cids[@]}; do
+        if [ ! -z "$cleanup" ]; then
+            docker rm ${id} >/dev/null
+            log_success "[+] Container $id deleted"
+        fi
+        index=$((index+1))
+    done
+}
+
+if [ ! -z "$detached" ]; then
+    (
+        docker wait $dlist >/dev/null
+        maybe_cleanup
+    ) &
+    pid=$!
+    log_success "[+] Background process spawned with PID: $pid"
+    disown $pid
+else
+    docker wait $dlist >/dev/null
+    maybe_cleanup
+fi

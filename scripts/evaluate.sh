@@ -98,26 +98,23 @@ else
     image_name=$(echo "pingu-${fuzzer}-${generator}-${protocol}-${impl}:${version:-latest}" | tr 'A-Z' 'a-z')
 fi
 
-output_tar_prefix="${output}/out-${fuzzer}-${protocol}-${impl}-${version}"
-log_info "[+] Searching for output files matching: ${output_tar_prefix}*"
-output_files=($(ls ${output_tar_prefix}* 2>/dev/null))
-if [[ ${#output_files[@]} -eq 0 ]]; then
-    log_error "[!] No output files found matching the prefix: ${output_tar_prefix}"
+output_tar_prefix="${output}/pingu-${fuzzer}-${protocol}-${impl}"
+log_info "[+] Searching for output folders matching: ${output_tar_prefix}*"
+output_folders=($(ls -d ${output_tar_prefix}* 2>/dev/null))
+if [[ ${#output_folders[@]} -eq 0 ]]; then
+    log_error "[!] No output folders found matching the prefix: ${output_tar_prefix}"
     exit 1
 fi
 
 if [[ -n "$count" ]]; then
-    output_files=("${output_files[@]:0:$count}")
+    output_folders=("${output_folders[@]:0:$count}")
 fi
 
-log_success "[+] Found output files: ${output_files[*]}"
+log_success "[+] Found output folders: ${output_folders[*]}"
 
 coverage_files=()
-for output_file in "${output_files[@]}"; do
-    log_info "[+] Extracting ${output_file}"
-    mkdir -p ${output_file%.tar.gz}
-    tar -zxvf "${output_file}" -C ${output_file%.tar.gz} --strip-components=1 1>/dev/null
-    coverage_file="${output_file%.tar.gz}/coverage.csv"
+for output_folder in "${output_folders[@]}"; do
+    coverage_file="${output_folder}/coverage.csv"
     coverage_files+=("${coverage_file}")
 done
 

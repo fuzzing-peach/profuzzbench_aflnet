@@ -10,7 +10,7 @@ source scripts/utils.sh
 args=($(get_args_before_double_dash "$@"))
 docker_args=$(get_args_after_double_dash "$@")
 
-opt_args=$(getopt -o f:t:v: -l fuzzer:,target:,version:,generator: --name "$0" -- "${args[@]}")
+opt_args=$(getopt -o f:t:v: -l fuzzer:,target:,version:,generator:,flags: --name "$0" -- "${args[@]}")
 if [ $? != 0 ]; then
     log_error "[!] Error in parsing shell arguments."
     exit 1
@@ -40,6 +40,10 @@ while true; do
         generator="$2"
         shift 2
         ;;
+    --flags)
+        flags="$2"
+        shift 2
+        ;;
     *)
         break
         ;;
@@ -67,7 +71,7 @@ log_success "[+] Docker build args: ${docker_args}"
 # --build-arg HTTP_PROXY=http://172.17.0.1:7890 --build-arg HTTPS_PROXY=http://172.17.0.1:7890
 # If needs to add dns server, passing:
 # --build-arg DNS_SERVER=9.9.9.9
-docker build --build-arg FUZZER=$fuzzer --build-arg TARGET=$target --build-arg VERSION=$version --build-arg ARGS=$generator --build-arg USER_UID="$(id -u)" --build-arg USER_GID="$(id -g)" -f scripts/Dockerfile $docker_args . -t $image_name
+DOCKER_BUILDKIT=1 docker build --build-arg FUZZER=$fuzzer --build-arg TARGET=$target --build-arg VERSION=$version --build-arg GENERATOR=$generator --build-arg USER_UID="$(id -u)" --build-arg USER_GID="$(id -g)" -f scripts/Dockerfile $docker_args . -t $image_name
 if [[ $? -ne 0 ]]; then
     log_error "[!] Error while building the docker image: $image_name"
     exit 1

@@ -2,26 +2,30 @@
 
 function checkout {
     mkdir -p repo
-    git clone https://gitee.com/zzroot/wolfssl.git repo/wolfssl
-    pushd repo/wolfssl >/dev/null
-    
-    git checkout "$@"
-    ./autogen.sh
-
+    if [ ! -d "repo/gnutls" ]; then
+        git clone https://gitee.com/kherrisan/gnutls.git repo/gnutls
+    fi
+    pushd repo/gnutls >/dev/null
+    # Check if the checkout changed the commit
+    current_commit=$(git rev-parse HEAD)
+    if [[ ! "${current_commit}" == "$@"* ]]; then
+        echo "Checkout will result in a different commit than requested."
+        echo "Requested: $@"
+        echo "Current: ${current_commit:0:8}"
+        git checkout "$@"
+        git apply ${HOME}/profuzzbench/subjects/TLS/GnuTLS/fuzzing.patch
+        ./bootstrap
+    fi
     popd >/dev/null
 }
 
 function replay {
-    ${HOME}/aflnet/aflnet-replay $1 TLS 4433 100 &
-    LD_PRELOAD=libgcov_preload.so:libfake_random.so FAKE_RANDOM=1 \
-    timeout -k 1s 3s ./examples/server/server \
-        -c ${HOME}/profuzzbench/test.fullchain.pem \
-        -k ${HOME}/profuzzbench/test.key.pem \
-        -e -p 4433
-    wait
+    exit 1
 }
 
 function build_aflnet {
+    exit 1
+
     mkdir -p target/aflnet
     rm -rf target/aflnet/*
     cp -r repo/wolfssl target/aflnet/
@@ -30,6 +34,7 @@ function build_aflnet {
     export CC=$HOME/aflnet/afl-clang-fast
     export AFL_USE_ASAN=1
 
+    ./autogen.sh
     ./configure --enable-static --enable-shared=no
     make examples/server/server ${MAKE_OPT}
 
@@ -39,6 +44,8 @@ function build_aflnet {
 }
 
 function run_aflnet {
+    exit 1
+
     timeout=$1
     outdir=/tmp/fuzzing-output
     indir=${HOME}/profuzzbench/subjects/TLS/OpenSSL/in-tls
@@ -64,7 +71,7 @@ function run_aflnet {
     list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
     cd ${HOME}/target/gcov/consumer/wolfssl
     compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv
-    grcov --branch --threads 2 -s . -t html . -o ${outdir}/cov_html
+    grcov --threads 2 -s . -t html . -o ${outdir}/cov_html
 
     popd >/dev/null
 }
@@ -89,20 +96,20 @@ function build_sgfuzz {
 function build_ft_generator {
     mkdir -p target/ft/generator
     rm -rf target/ft/generator/*
-    cp -r repo/wolfssl target/ft/generator/wolfssl
-    pushd target/ft/generator/wolfssl >/dev/null
+    cp -r repo/gnutls target/ft/generator/gnutls
+    pushd target/ft/generator/gnutls >/dev/null
 
     export FT_CALL_INJECTION=1
     export FT_HOOK_INS=branch,load,store,select,switch
     export CC=${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast
     export CXX=${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-clang-fast++
-    export CFLAGS="-O3 -g"
-    export CXXFLAGS="-O3 -g"
+    export CFLAGS="-g -O3 -DNDEBUG -DFT_FUZZING -DFT_GENERATOR"
+    export CXXFLAGS="-g -O3 -DNDEBUG -DFT_FUZZING -DFT_GENERATOR"
     export GENERATOR_AGENT_SO_DIR="${HOME}/fuzztruction-net/target/release/"
     export LLVM_PASS_SO="${HOME}/fuzztruction-net/generator/pass/fuzztruction-source-llvm-pass.so"
 
-    ./configure --enable-static --enable-shared=no
-    make examples/client/client ${MAKE_OPT}
+    ./configure --disable-tests --disable-doc --disable-shared
+    make ${MAKE_OPT}
 
     rm -rf .git
 
@@ -115,17 +122,17 @@ function build_ft_consumer {
 
     mkdir -p target/ft/consumer
     rm -rf target/ft/consumer/*
-    cp -r repo/wolfssl target/ft/consumer/wolfssl
-    pushd target/ft/consumer/wolfssl >/dev/null
+    cp -r repo/gnutls target/ft/consumer/gnutls
+    pushd target/ft/consumer/gnutls >/dev/null
 
     export AFL_PATH=${HOME}/fuzztruction-net/consumer/aflpp-consumer
     export CC=${AFL_PATH}/afl-clang-fast
     export CXX=${AFL_PATH}/afl-clang-fast++
-    export CFLAGS="-O3 -g -fsanitize=address"
-    export CXXFLAGS="-O3 -g -fsanitize=address"
+    export CFLAGS="-O3 -g -fsanitize=address -DFT_FUZZING -DFT_CONSUMER"
+    export CXXFLAGS="-O3 -g -fsanitize=address -DFT_FUZZING -DFT_CONSUMER"
 
-    ./configure --enable-static --enable-shared=no
-    make examples/server/server ${MAKE_OPT}
+    ./configure --disable-tests --disable-doc --disable-shared
+    make ${MAKE_OPT}
 
     rm -rf .git
 
@@ -134,7 +141,7 @@ function build_ft_consumer {
 
 function run_ft {
     timeout=$1
-    consumer="WolfSSL"
+    consumer="GnuTLS"
     generator=${GENERATOR:-$consumer}
     ts=$(date +%s)
     work_dir=/tmp/fuzzing-output
@@ -144,30 +151,35 @@ function run_ft {
     # according to the targeted fuzzer and generated
     temp_file=$(mktemp)
     sed -e "s|WORK-DIRECTORY|${work_dir}|g" -e "s|UID|$(id -u)|g" -e "s|GID|$(id -g)|g" ${HOME}/profuzzbench/ft.yaml >"$temp_file"
-    cat "$temp_file" >ft.yaml
-    printf "\n" >>ft.yaml
+    cat "$temp_file" >ft-gnutls.yaml
+    printf "\n" >>ft-gnutls.yaml
     rm "$temp_file"
-    cat ${HOME}/profuzzbench/subjects/TLS/${generator}/ft-source.yaml >>ft.yaml
-    cat ${HOME}/profuzzbench/subjects/TLS/${consumer}/ft-sink.yaml >>ft.yaml
+    cat ${HOME}/profuzzbench/subjects/TLS/${generator}/ft-source.yaml >>ft-gnutls.yaml
+    printf "\n" >>ft-gnutls.yaml
+    cat ${HOME}/profuzzbench/subjects/TLS/${consumer}/ft-sink.yaml >>ft-gnutls.yaml
 
     # running ft-net
-    sudo ${HOME}/fuzztruction-net/target/release/fuzztruction --purge ft.yaml fuzz -t ${timeout}s
+    sudo ${HOME}/fuzztruction-net/target/release/fuzztruction --purge ft-gnutls.yaml fuzz -t ${timeout}s
 
     # collecting coverage results
-    sudo ${HOME}/fuzztruction-net/target/release/fuzztruction ft.yaml gcov -t 3s
+    sudo ${HOME}/fuzztruction-net/target/release/fuzztruction ft-gnutls.yaml gcov -t 3s --delete
     sudo chmod -R 755 $work_dir
     sudo chown -R $(id -u):$(id -g) $work_dir
-    cd ${HOME}/target/gcov/consumer/wolfssl
-    grcov --branch --threads 2 -s . -t html . -o ${work_dir}/cov_html
+    cd ${HOME}/target/gcov/consumer/gnutls
+    gcovr -r . --html --html-details -o index.html
+    mkdir -p ${work_dir}/cov_html
+    cp *.html ${work_dir}/cov_html
 
     popd >/dev/null
 }
 
 function build_pingu_generator {
+    exit 1
+
     mkdir -p target/pingu/generator
     rm -rf target/pingu/generator/*
     cp -r repo/wolfssl target/pingu/generator/wolfssl
-    pushd target/pingu/generator/wolfssl >/dev/null 
+    pushd target/pingu/generator/wolfssl >/dev/null
 
     export FT_HOOK_INS=load,store
     export CC=${HOME}/pingu/fuzztruction/generator/pass/fuzztruction-source-clang-fast
@@ -177,6 +189,7 @@ function build_pingu_generator {
     export GENERATOR_AGENT_SO_DIR="${HOME}/pingu/fuzztruction/target/debug/"
     export LLVM_PASS_SO="${HOME}/pingu/fuzztruction/generator/pass/fuzztruction-source-llvm-pass.so"
 
+    ./autogen.sh
     ./configure --enable-static --enable-shared=no
     make examples/client/client ${MAKE_OPT}
 
@@ -186,6 +199,8 @@ function build_pingu_generator {
 }
 
 function build_pingu_consumer {
+    exit 1
+
     sudo cp ${HOME}/profuzzbench/scripts/ld.so.conf/pingu.conf /etc/ld.so.conf.d/
     sudo ldconfig
 
@@ -199,6 +214,7 @@ function build_pingu_consumer {
     export CFLAGS="-O3 -g -fsanitize=address"
     export CXXFLAGS="-O3 -g -fsanitize=address"
 
+    ./autogen.sh
     ./configure --enable-static --enable-shared=no
     make examples/server/server ${MAKE_OPT}
 
@@ -232,7 +248,7 @@ function run_pingu {
     sudo chmod -R 755 $work_dir
     sudo chown -R $(id -u):$(id -g) $work_dir
     cd ${HOME}/target/gcov/consumer/wolfssl
-    grcov --branch --threads 2 -s . -t html -o ${work_dir}/cov_html .
+    grcov --threads 2 -s . -t html -o ${work_dir}/cov_html .
 
     popd >/dev/null
 }
@@ -240,22 +256,25 @@ function run_pingu {
 function build_gcov {
     mkdir -p target/gcov/consumer
     rm -rf target/gcov/consumer/*
-    cp -r repo/wolfssl target/gcov/consumer/wolfssl
-    pushd target/gcov/consumer/wolfssl >/dev/null
+    cp -r repo/gnutls target/gcov/consumer/gnutls
+    pushd target/gcov/consumer/gnutls >/dev/null
 
-    export CFLAGS="-fprofile-arcs -ftest-coverage"
-    export CXXFLAGS="-fprofile-arcs -ftest-coverage"
-    export CPPFLAGS="-fprofile-arcs -ftest-coverage"
-    export LDFLAGS="-fprofile-arcs -ftest-coverage"
+    export CFLAGS="${CFLAGS} -fprofile-arcs -ftest-coverage"
+    export CXXFLAGS="${CXXFLAGS} -fprofile-arcs -ftest-coverage"
+    export LDFLAGS="${LDFLAGS} -fprofile-arcs -ftest-coverage"
 
-    ./configure --enable-static --enable-shared=no
-    make examples/server/server ${MAKE_OPT}
+    ./configure --enable-code-coverage --disable-tests --disable-doc --disable-shared
+    make ${MAKE_OPT}
 
-    rm -rf a-conftest.gcno .git
+    rm -rf .git a-conftest.gcno
 
     popd >/dev/null
 }
 
 function install_dependencies {
-    echo "Not implemented"
+    sudo apt-get install -y dash git-core autoconf libtool gettext autopoint lcov
+    sudo apt-get install -y automake python3 nettle-dev libp11-kit-dev libtspi-dev libunistring-dev
+    sudo apt-get install -y libtasn1-bin libtasn1-6-dev libidn2-0-dev gawk gperf
+    sudo apt-get install -y libtss2-dev libunbound-dev dns-root-data bison gtk-doc-tools
+    sudo apt-get install -y texinfo texlive texlive-plain-generic texlive-extra-utils libprotobuf-c1 libev4 libev-dev
 }

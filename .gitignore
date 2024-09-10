@@ -1,6 +1,8 @@
 results-*
 output
+archive
 **/shortcut.sh
 ft-*
 **/__pycache__*
 **/.ipynb_checkpoints*
+volume

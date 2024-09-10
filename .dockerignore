@@ -2,3 +2,6 @@
 .ccache
 results-*
 output
+archive
+ft-*
+volume

@@ -1,10 +1,6 @@
 source:
   bin-path: "/home/user/target/ft/generator/openssl/apps/openssl"
-  env:
-    - LD_LIBRARY_PATH: "/home/user/target/ft/generator/openssl"
-    - LD_PRELOAD: "libfake_random.so"
-    - FAKE_RANDOM: "1"
-  arguments: ["s_client", "-connect", "127.0.0.1:4433", "-reconnect", "-4"]
+  arguments: ["s_client", "-connect", "127.0.0.1:4433", "-4"]
   input-type: Tcp
   output-type: Tcp
   is-server: false

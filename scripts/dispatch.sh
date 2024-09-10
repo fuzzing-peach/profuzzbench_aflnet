@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+set -e
+set -o pipefail
+
 cd $(dirname $0)
 cd ..
 source scripts/utils.sh
@@ -56,23 +59,26 @@ pingu)
         (
             # build consumer
             source $target_config
-            # ignore the ${GENERATOR}
-            in_subshell build_pingu_consumer "${@:2}"
+            # build_pingu_consumer $flags(is written to the environment variable FLAGS)
+            in_subshell build_pingu_consumer
         )
         (
             # build generator
-            if [[ -n $1 ]]; then
-                generator=${target%/*}/$1
+            # $GENERATOR is in the form of OpenSSL, WolfSSL, etc.
+            if [[ -n $GENERATOR ]]; then
+                # generator is in the form of TLS/OpenSSL, TLS/WolfSSL, etc.
+                generator=${target%/*}/$GENERATOR
             else
+                # generator is the same as target
                 generator=${target}
             fi
             source "subjects/$generator/config.sh"
-            in_subshell build_pingu_generator "${@:2}"
+            in_subshell build_pingu_generator
         )
     else
         # run generator-consumer
         source $target_config
-        # run_pingu $timeout $generator
+        # run_pingu $generator $timeout ...(other args)
         in_subshell run_pingu "$@"
     fi
     ;;
@@ -86,22 +92,22 @@ ft)
             # build consumer
             source $target_config
             # ignore the ${GENERATOR}
-            in_subshell build_ft_consumer "${@:2}"
+            in_subshell build_ft_consumer
         )
         (
             # build generator
-            if [[ -n $1 ]]; then
-                generator=${target%/*}/$1
+            if [[ -n $GENERATOR ]]; then
+                generator=${target%/*}/$GENERATOR
             else
                 generator=${target}
             fi
             source "subjects/$generator/config.sh"
-            in_subshell build_ft_generator "${@:2}"
+            in_subshell build_ft_generator
         )
     else
         # run generator-consumer
         source $target_config
-        # run_ft $timeout $generator
+        # run_ft $generator $timeout ...(other args)
         in_subshell run_ft "$@"
     fi
     ;;

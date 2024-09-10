@@ -82,11 +82,12 @@ function compute_coverage {
   touch $covfile
 
   # clear gcov data
-  gcovr -r . -s -d >/dev/null 2>&1
+  grcov-all -s . -d >/dev/null 2>&1
 
   # output the header of the coverage file which is in the CSV format
   # Time: timestamp, l_per/b_per and l_abs/b_abs: line/branch coverage in percentage and absolutate number
-  echo "time,l_per,l_abs,b_per,b_abs" >>$covfile
+  echo "time,l_abs,l_per,b_abs,b_per"
+  echo "time,l_abs,l_per,b_abs,b_per" >>$covfile
 
   # process other testcases
   count=0
@@ -99,26 +100,17 @@ function compute_coverage {
     count=$((count + 1))
     rem=$((count % step))
     if [ "$rem" != "0" ]; then continue; fi
-    cov_data=$(gcovr -r . -s | grep "[lb][a-z]*:")
-    echo $cov_data
-    l_per=$(echo "$cov_data" | grep lines | cut -d" " -f2 | rev | cut -c2- | rev)
-    l_abs=$(echo "$cov_data" | grep lines | cut -d" " -f3 | cut -c2-)
-    b_per=$(echo "$cov_data" | grep branch | cut -d" " -f2 | rev | cut -c2- | rev)
-    b_abs=$(echo "$cov_data" | grep branch | cut -d" " -f3 | cut -c2-)
-
-    echo "$time,$l_per,$l_abs,$b_per,$b_abs" >>$covfile
+    cov_res=$(grcov-all -s .)
+    echo "${time},${cov_res}"
+    echo "${time},${cov_res}" >>$covfile
   done
 
   # output cov data for the last testcase(s) if step > 1
   if [[ $step -gt 1 ]]; then
     time=$(stat -c %Y $f)
-    cov_data=$(gcovr -r . -s | grep "[lb][a-z]*:")
-    l_per=$(echo "$cov_data" | grep lines | cut -d" " -f2 | rev | cut -c2- | rev)
-    l_abs=$(echo "$cov_data" | grep lines | cut -d" " -f3 | cut -c2-)
-    b_per=$(echo "$cov_data" | grep branch | cut -d" " -f2 | rev | cut -c2- | rev)
-    b_abs=$(echo "$cov_data" | grep branch | cut -d" " -f3 | cut -c2-)
-
-    echo "$time,$l_per,$l_abs,$b_per,$b_abs" >>$covfile
+    cov_res=$(grcov-all -s .)
+    echo "${time},${cov_res}"
+    echo "${time},${cov_res}" >>$covfile
   fi
 }
 
