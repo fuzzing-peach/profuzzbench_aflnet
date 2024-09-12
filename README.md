@@ -1,23 +1,43 @@
 # PinguFuzzBench - A Benchmark for Cryptographic Network Protocol Fuzzing
 
 > [!NOTE] 
-> **PINGU** is the abbreviation of cryptogra**P**hc network**ING** comm**U**nication protocols :)
+> **PINGU** is the abbreviation of cryptogra**P**hic network**ING** comm**U**nication protocols :)
 
 PinguFuzzBench is a benchmark for the fuzzing of cryptographic network protocols. It is a specialized version of ProFuzzbench, which has removed some of the plaintext transmission network protocols from ProFuzzbench and added multiple encrypted network protocols (including TLS, SSH, QUIC, DTLS).
 
 # Progress
 ***
 
-| Protocol                              | **Pingu** | AFLNet | StateAFL | SGFuzz | FT-Net | tlspuffin | tlsfuzzer | tls-anvil |
-| ------------------------------------- | --------- | ------ | -------- | ------ | ------ | --------- | --------- | --------- |
-| [TLS/OpenSSL](subjects/TLS/OpenSSL)   | ✅         | ✅      |          |        | ✅      |           |           |           |
-| [TLS/WolfSSL](subjects/TLS/WolfSSL)   | ✅         | ✅      |          |        | ✅      |           |           |           |
-| [TLS/LibreSSL](subjects/TLS/LibreSSL) |           |        |          |        |        |           |           |           |
-| [TLS/GnuTLS](subjects/TLS/GnuTLS)     |           |        |          |        | ✅      |           |           |           |
-| SSH/OpenSSH                           |           |        |          |        |        |           |           |           |
-| QUIC/OpenSSL                          |           |        |          |        |        |           |           |           |
-| DTLS/OpenSSL                          |           |        |          |        |        |           |           |           |
+> [!NOTE]
+> dcmtk, live555 and mosquitto are not cryptographic network protocols, but are included here in the benchmark for the purpose of testing the workness of the fuzzer, and serve as the baseline for cross-fuzzers comparison.
 
+| Protocol                                | **Pingu** | AFLNet | StateAFL | SGFuzz | FT-Net | tlspuffin | tlsfuzzer | tls-anvil |
+| --------------------------------------- | --------- | ------ | -------- | ------ | ------ | --------- | --------- | --------- |
+| [DICOM/dcmtk]()                         |           |        |          |        |        |           |           |           |
+| [RTP/live555]()                         |           |        |          |        |        |           |           |           |
+| [MQTT/mosquitto]()                      |           |        |          |        |        |           |           |           |
+| [TLS/openssl](subjects/TLS/OpenSSL)     | ✅         | ✅      |          |        | ✅      |           |           |           |
+| [TLS/wolfssl](subjects/TLS/WolfSSL)     | ✅         | ✅      |          |        | ✅      |           |           |           |
+| [TLS/libressl](subjects/TLS/LibreSSL)   |           |        |          |        |        |           |           |           |
+| [TLS/boringssl](subjects/TLS/boringssl) |           |        |          |        |        |           |           |           |
+| [TLS/gnutls](subjects/TLS/GnuTLS)       |           |        |          |        | ✅      |           |           |           |
+| [TLS/s2n](subjects/TLS/s2n)             |           |        |          |        |        |           |           |           |
+| [SSH/openssh]()                         |           |        |          |        |        |           |           |           |
+| [SSH/wolfssh]()                         |           |        |          |        |        |           |           |           |
+| [SSH/dropbear]()                        |           |        |          |        |        |           |           |           |
+| SSH/libssh                              |           |        |          |        |        |           |           |           |
+| [QUIC/openssl]()                        |           |        |          |        |        |           |           |           |
+| [QUIC/ngtcp2]()                         |           |        |          |        |        |           |           |           |
+| QUIC/mvfst                              |           |        |          |        |        |           |           |           |
+| QUIC/picoquic                           |           |        |          |        |        |           |           |           |
+| QUIC/lsquic                             |           |        |          |        |        |           |           |           |
+| QUIC/quiche                             |           |        |          |        |        |           |           |           |
+| QUIC/xquic                              |           |        |          |        |        |           |           |           |
+| [HTTP3/nginx]()                         |           |        |          |        |        |           |           |           |
+| [HTTP3/apache]()                        |           |        |          |        |        |           |           |           |
+| [HTTP3/h2o]()                           |           |        |          |        |        |           |           |           |
+
+# Limitations
 
 # Folder structure
 
