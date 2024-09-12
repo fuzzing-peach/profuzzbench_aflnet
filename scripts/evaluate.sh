@@ -35,7 +35,7 @@ else
     log_success "[+] pingu-eval container already exists"
 fi
 
-opt_args=$(getopt -o f:t:v:o:c: -l fuzzer:,target:,version:,generator:,output:,count: --name "$0" -- "${args[@]}")
+opt_args=$(getopt -o f:t:v:o:c: -l fuzzer:,target:,version:,generator:,output:,count:,summary --name "$0" -- "${args[@]}")
 if [ $? != 0 ]; then
     log_error "[!] Error in parsing shell arguments."
     exit 1
@@ -73,6 +73,10 @@ while true; do
         count="$2"
         shift 2
         ;;
+    --summary)
+        summary=true
+        shift
+        ;;
     *)
         break
         ;;
@@ -101,6 +105,12 @@ fi
 output_tar_prefix="${output}/pingu-${fuzzer}-${protocol}-${impl}"
 log_info "[+] Searching for output folders matching: ${output_tar_prefix}*"
 output_folders=($(ls -d ${output_tar_prefix}* 2>/dev/null))
+# Filter out non-directory entries
+output_folders=($(for folder in "${output_folders[@]}"; do
+    if [[ -d "$folder" ]]; then
+        echo "$folder"
+    fi
+done))
 if [[ ${#output_folders[@]} -eq 0 ]]; then
     log_error "[!] No output folders found matching the prefix: ${output_tar_prefix}"
     exit 1
@@ -118,4 +128,8 @@ for output_folder in "${output_folders[@]}"; do
     coverage_files+=("${coverage_file}")
 done
 
-docker exec -w /home/user/profuzzbench -it pingu-eval python3 scripts/plot.py -c 60 -s 1 -o "${output_tar_prefix}-coverage.png" "${coverage_files[@]}"
+if [[ -n "$summary" ]]; then
+    docker exec -w /home/user/profuzzbench -it pingu-eval python3 scripts/evaluation/summary.py "${coverage_files[@]}"
+else 
+    docker exec -w /home/user/profuzzbench -it pingu-eval python3 scripts/evaluation/plot.py -c 60 -s 1 -o "${output_tar_prefix}-coverage.png" "${coverage_files[@]}"
+fi
