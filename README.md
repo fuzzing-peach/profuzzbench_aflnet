@@ -92,18 +92,30 @@ In the following tutorial, you can find instructions to run AFLnwe and AFLnet (t
 
 
 # Tutorial - Fuzzing TLS/OpenSSL server with [AFLNet](https://github.com/aflnet/aflnet)
-Follow the steps below to run and collect experimental results for TLS/OpenSSL. The similar steps should be followed to run experiments on other subjects. Each subject program comes with a README.md file showing subject-specific commands to run experiments.
+Follow the steps below to run and collect experimental results for TLS/OpenSSL. The similar steps should be followed to run experiments on other subjects. Each subject program comes with a README.md file showing subject-specific commands to run experiments.#
 
-## Step-0. Prerequisites
+## Prerequisites
 
 - **Docker**: Make sure you have docker installed on your machine. If not, please refer to [Docker installation](https://docs.docker.com/get-docker/). The docker-engine that supports DOCKER_BUILDKIT=1 would be better, but it is not required.
 - **Storage**: Also make sure you have enough storage space for the built images and the fuzzing results. Usually, the pingu-env image is around 3.3GB and the fuzzing runtime image is around 4.3GB, depending on the target program.
 
+## Step-0. (Optional) Build and launch the development environment
+
+For development purpose, you can build and launch a dedicated development environment for the fuzzing runtime. The container contains all the built fuzzing tool binaries. Note that the fuzzing target programs are not included. 
+
+The development environment image is about 12GB.
+
+```sh
+./scripts/build-env.sh dev -- --build-arg HTTP_PROXY=http://127.0.0.1:9870 --build-arg HTTPS_PROXY=http://127.0.0.1:9870 --network=host --build-arg GITHUB_TOKEN=xxx 
+# Then launch the development container in the background, keeping it running with tail -f /dev/null
+docker run -d -v $(pwd):/home/user/profuzzbench --name pingu-dev pingu-dev:latest tail -f /dev/null
+# Now you can attach to the container and do some hard working
+docker exec -it pingu-dev /bin/bash
+```
 
 ## Step-1. Build the base image
 
 First change the working directory to the root directory of the repository.
-
 
 ```sh
 ./scripts/build-env.sh -- --build-arg HTTP_PROXY=http://127.0.0.1:9870 --build-arg HTTPS_PROXY=http://127.0.0.1:9870 --network=host --build-arg GITHUB_TOKEN=xxx 
