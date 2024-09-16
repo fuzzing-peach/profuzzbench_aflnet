@@ -18,4 +18,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # print(args)
     res = summary(args.coverage_files)
+    res = res.round(4)
     print(json.dumps(res.to_dict()))
