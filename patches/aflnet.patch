@@ -85,6 +85,19 @@ index 3b0ed0a..1279383 100644
    if (qemu_mode)
      use_argv = get_qemu_argv(argv[0], argv + optind, argc - optind);
    else
+diff --git a/afl-gcc.c b/afl-gcc.c
+index f0e4d85..5bfae06 100644
+--- a/afl-gcc.c
++++ b/afl-gcc.c
+@@ -284,7 +284,7 @@ static void edit_params(u32 argc, char** argv) {
+        AFL-specific, the other is shared with libfuzzer. */
+ 
+     cc_params[cc_par_cnt++] = "-D__AFL_COMPILER=1";
+-    cc_params[cc_par_cnt++] = "-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=1";
++    // cc_params[cc_par_cnt++] = "-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=1";
+ 
+   }
+ 
 diff --git a/aflnet.c b/aflnet.c
 index a527b7e..b4fef7e 100644
 --- a/aflnet.c
@@ -155,7 +168,7 @@ index d4a0fdc..10aab79 100644
  
  // Network communication functions
 diff --git a/llvm_mode/afl-clang-fast.c b/llvm_mode/afl-clang-fast.c
-index c154e01..8a2ee5a 100644
+index c154e01..a119167 100644
 --- a/llvm_mode/afl-clang-fast.c
 +++ b/llvm_mode/afl-clang-fast.c
 @@ -40,6 +40,8 @@
@@ -193,6 +206,15 @@ index c154e01..8a2ee5a 100644
  
      cc_params[cc_par_cnt++] = cur;
  
+@@ -233,7 +237,7 @@ static void edit_params(u32 argc, char** argv) {
+ 
+   cc_params[cc_par_cnt++] = "-D__AFL_HAVE_MANUAL_CONTROL=1";
+   cc_params[cc_par_cnt++] = "-D__AFL_COMPILER=1";
+-  cc_params[cc_par_cnt++] = "-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=1";
++  // cc_params[cc_par_cnt++] = "-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=1";
+ 
+   /* When the user tries to use persistent or deferred forkserver modes by
+      appending a single line to the program, we want to reliably inject a
 diff --git a/llvm_mode/afl-llvm-pass.so.cc b/llvm_mode/afl-llvm-pass.so.cc
 index 154a5db..b7b096c 100644
 --- a/llvm_mode/afl-llvm-pass.so.cc
