@@ -65,7 +65,16 @@ else
     image_name=$(echo "pingu-${fuzzer}-${generator}-${protocol}-${impl}:${version:-latest}" | tr 'A-Z' 'a-z')
 fi
 
-log_success "[+] Building docker image: ${image_name}"
+# Check if pingu-env-${fuzzer} docker image exists
+env_image_name="pingu-env-${fuzzer}:latest"
+if ! docker image inspect ${env_image_name} >/dev/null 2>&1; then
+    env_image_name="pingu-env:latest"
+fi
+
+# Set the base image argument for the Dockerfile
+docker_args="--build-arg BASE_IMAGE=${env_image_name} ${docker_args}"
+
+log_success "[+] Building docker image: ${image_name}, from ${env_image_name}"
 log_success "[+] Docker build args: ${docker_args}"
 # If http proxy is required, passing:
 # --build-arg HTTP_PROXY=http://172.17.0.1:7890 --build-arg HTTPS_PROXY=http://172.17.0.1:7890

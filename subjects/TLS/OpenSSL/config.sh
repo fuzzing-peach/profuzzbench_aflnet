@@ -5,7 +5,7 @@ function checkout {
     git clone https://gitee.com/sz_abundance/openssl.git repo/openssl
     pushd repo/openssl >/dev/null
     git checkout "$@"
-    git apply ${HOME}/fuzztruction-net/fuzztruction-experiments/comparison-with-state-of-the-art/binaries/networked/openssl/fuzzing.patch
+    git apply ${HOME}/profuzzbench/subjects/TLS/OpenSSL/ft-openssl.patch
     popd >/dev/null
 }
 
@@ -68,7 +68,8 @@ function run_aflnet {
     list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
     cd ${HOME}/target/gcov/consumer/openssl
     compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv
-    grcov --branch --threads 2 -s . -t html . -o ${outdir}/cov_html
+    mkdir -p ${outdir}/cov_html
+    gcovr -r . --html --html-details -o ${outdir}/cov_html/index.html
 
     popd >/dev/null
 }

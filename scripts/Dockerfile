@@ -1,4 +1,6 @@
-FROM pingu-env:latest
+ARG BASE_IMAGE=pingu-env:latest
+
+FROM ${BASE_IMAGE}
 
 USER user
 ENV HOME=/home/user
@@ -20,14 +22,10 @@ ENV no_proxy=localhost,127.0.0.1
 
 # RUN pwd
 RUN --mount=type=bind,source=.,target=/home/user/profuzzbench \
-    --mount=type=cache,target=/home/user/repo,uid=${USER_ID},gid=${GROUP_ID} \
     bash ${HOME}/profuzzbench/scripts/dispatch.sh ${TARGET} build deps
 RUN --mount=type=bind,source=.,target=/home/user/profuzzbench \
-    --mount=type=cache,target=/home/user/repo,uid=${USER_ID},gid=${GROUP_ID} \
     bash ${HOME}/profuzzbench/scripts/dispatch.sh ${TARGET} checkout ${VERSION}
 RUN --mount=type=bind,source=.,target=/home/user/profuzzbench \
-    --mount=type=cache,target=/home/user/repo,uid=${USER_ID},gid=${GROUP_ID} \
     bash ${HOME}/profuzzbench/scripts/dispatch.sh ${TARGET} build gcov
 RUN --mount=type=bind,source=.,target=/home/user/profuzzbench \
-    --mount=type=cache,target=/home/user/repo,uid=${USER_ID},gid=${GROUP_ID} \
     bash ${HOME}/profuzzbench/scripts/dispatch.sh ${TARGET} build ${FUZZER}

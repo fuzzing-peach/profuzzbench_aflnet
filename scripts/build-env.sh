@@ -6,13 +6,33 @@ cd $(dirname $0)
 cd ..
 source scripts/utils.sh
 
-[ -z "$1" ] && profile="env" || profile="$1"
-if [ "$profile" = "dev" ]; then
-    image="pingu-dev"
-    dockerfile="Dockerfile-dev"
-else
-    image="pingu-env"
-    dockerfile="Dockerfile-env"
+parse_args() {
+    local OPTIND
+    while getopts ":f:" opt; do
+        case $opt in
+            f)
+                fuzzer="$OPTARG"
+                ;;
+            \?)
+                echo "Invalid option: -$OPTARG" >&2
+                ;;
+            :)
+                echo "Option -$OPTARG requires an argument." >&2
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Get arguments before double dash
+args=$(get_args_before_double_dash "$@")
+
+eval "parse_args $args"
+
+if [[ -n "$fuzzer" ]]; then
+    fuzzer=$(echo "$fuzzer" | tr '[:upper:]' '[:lower:]')
+    image="pingu-env-${fuzzer}"
+    dockerfile="Dockerfile-env-${fuzzer}"
 fi
 
 log_success "[+] Build mode: ${profile}"
