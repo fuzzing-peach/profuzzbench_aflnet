@@ -75,10 +75,10 @@ pingu-fuzzbench-folder
 │   └── SSH
 │   └── ...
 └── scripts: this folder contains all the scripts and configuration files to run experiments, collect & analyze results
-│   └── build-env.sh: this file builds the docker image according to Dockerfile-env (**pingu-env**) that contains all the fuzzer binaries
-│   └── Dockerfile-env
+│   └── build-env.sh: this file builds the docker image **pingu-env-${fuzzer}** according to Dockerfile-env-${fuzzer} that contains the source and binaries of the fuzzer specified and all the dependencies
+│   └── Dockerfile-env-${fuzzer}
 │   └── Dockerfile-dev: this file specifies the docker image that contains all the fuzzer source codes, dependencies and development environments
-│   └── build.sh: this file builds the image for fuzzing runtime, based on the image **pingu-env**, according to Dockerfile. Each target should be built in a separate docker image using different fuzzers, like the image for TLS/OpenSSL instrumented and fuzzed by AFLNet, the image will be **pingu-tls-openssl-aflnet**
+│   └── build.sh: this file builds the image for fuzzing runtime, based on the image **pingu-env-${fuzzer}**, according to Dockerfile. Each target should be built in a separate docker image using different fuzzers, like the image for TLS/OpenSSL instrumented and fuzzed by AFLNet, the image will be **pingu-aflnet-tls-openssl**
 │   └── Dockerfile: this file builds the fuzzing runtime environment. The built image may be repeatedly launched to evaluate the fuzzer several times
 │   └── run.sh: this file launches the fuzzing runtime container based on the image built by build.sh
 │   └── evaluate.sh: this file will builds and launches the evaluation container, based on Dockerfile-eval, which includes jupyter, matplotlib and other stuff. The container is named with **pingu-eval**
@@ -103,30 +103,29 @@ Follow the steps below to run and collect experimental results for TLS/OpenSSL. 
 - **Docker**: Make sure you have docker installed on your machine. If not, please refer to [Docker installation](https://docs.docker.com/get-docker/). The docker-engine that supports DOCKER_BUILDKIT=1 would be better, but it is not required.
 - **Storage**: Also make sure you have enough storage space for the built images and the fuzzing results. Usually, the pingu-env image is around 3.3GB and the fuzzing runtime image is around 4.3GB, depending on the target program.
 
-## Step-0. (Optional) Build and launch the development environment
-
 For development purpose, you can build and launch a dedicated development environment for the fuzzing runtime. The container contains all the built fuzzing tool binaries. Note that the fuzzing target programs are not included. 
-
-The development environment image is about 12GB.
-
-```sh
-./scripts/build-env.sh dev -- --build-arg HTTP_PROXY=http://127.0.0.1:9870 --build-arg HTTPS_PROXY=http://127.0.0.1:9870 --network=host --build-arg GITHUB_TOKEN=xxx 
-# Then launch the development container in the background, keeping it running with tail -f /dev/null
-docker run -d -v $(pwd):/home/user/profuzzbench --name pingu-dev pingu-dev:latest tail -f /dev/null
-# Now you can attach to the container and do some hard working
-docker exec -it pingu-dev /bin/bash
-```
 
 ## Step-1. Build the base image
 
 First change the working directory to the root directory of the repository.
 
 ```sh
-./scripts/build-env.sh -- --build-arg HTTP_PROXY=http://127.0.0.1:9870 --build-arg HTTPS_PROXY=http://127.0.0.1:9870 --network=host --build-arg GITHUB_TOKEN=xxx 
+./scripts/build-env.sh -f aflnet -- --build-arg HTTP_PROXY=http://127.0.0.1:9870 --build-arg HTTPS_PROXY=http://127.0.0.1:9870 --network=host --build-arg GITHUB_TOKEN=xxx 
 ```
+
+Arguments:
+- ***-f*** : name of the fuzzer. Supports aflnet, stateafl, sgfuzz, ft, puffin, pingu.
 
 The parameters specified after the **--** are the build arguments passed directly for the docker build command. You can specify sth like `--network=host --build-arg HTTP_PROXY=xxx`. Check the [Dockerfile-env](scripts/Dockerfile-env) to see the available build arguments.
 
+## Step-1.5. (Optional) Launch the development environment
+
+```sh
+./scripts/dev.sh -f aflnet -- --network=host --build-arg HTTP_PROXY=http://127.0.0.1:9870 --build-arg HTTPS_PROXY=http://127.0.0.1:9870
+# It will run the container in the background. You need to run this script again.
+# This time, arguments after the **--** can be ignored.
+./scripts/dev.sh -f aflnet
+```
 
 ## Step-2. Build the fuzzing runtime image
 
