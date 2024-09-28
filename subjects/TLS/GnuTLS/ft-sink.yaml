@@ -1,0 +1,31 @@
+sink:
+  bin-path: "/home/user/target/ft/consumer/gnutls/src/gnutls-serv"
+  env:
+    - LD_PRELOAD: "libfake_random.so"
+    - FAKE_RANDOM: "1"
+  arguments:
+    [
+      "-a",
+      "--earlydata",
+      "--x509keyfile=/home/user/profuzzbench/test.key.pem",
+      "--x509certfile=/home/user/profuzzbench/test.fullchain.pem",
+      "-p",
+      "4433",
+      "-b",
+    ]
+  working-dir: "/home/user/target/ft/consumer/gnutls"
+  input-type: Tcp
+  output-type: Tcp
+  is-server: true
+  server-port: "4433"
+  log-stdout: true
+  log-stderr: true
+  allow-unstable-sink: false
+
+gcov:
+  bin-path: "/home/user/target/gcov/consumer/gnutls/src/gnutls-serv"
+  env:
+    - LD_PRELOAD: "libfake_random.so"
+    - FAKE_RANDOM: "1"
+  src-dir: "/home/user/target/gcov/consumer/gnutls"
+  reporter: gcovr
