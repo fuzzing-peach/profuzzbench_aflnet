@@ -6,6 +6,16 @@ cd $(dirname $0)
 cd ..
 source scripts/utils.sh
 
+# Check if kernel.core_pattern is set to 'core'
+core_pattern=$(cat /proc/sys/kernel/core_pattern)
+if [ "$core_pattern" != "core" ]; then
+    log_error "[!] kernel.core_pattern is not set to 'core'. Current value: $core_pattern"
+    log_error "[!] Please set it to 'core' using: echo core | sudo tee /proc/sys/kernel/core_pattern"
+    exit 1
+fi
+
+log_success "[+] kernel.core_pattern is correctly set to 'core'"
+
 # Parameters after -- is passed directly to the run script
 args=($(get_args_before_double_dash "$@"))
 fuzzer_args=$(get_args_after_double_dash "$@")
