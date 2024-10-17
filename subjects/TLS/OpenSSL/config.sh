@@ -98,8 +98,78 @@ function build_stateafl {
 }
 
 function build_sgfuzz {
-    echo "Not implemented"
+    mkdir -p target/sgfuzz
+    rm -rf target/sgfuzz/*
+    cp -r repo/openssl target/sgfuzz/openssl
+    pushd target/sgfuzz/openssl >/dev/null
+
+    cp "${HOME}/sgfuzz/example/openssl/blocked_variables.txt" ./
+
+    python3 "${HOME}/sgfuzz/sanitizer/State_machine_instrument.py" ./ -b blocked_variables.txt
+
+    ./config -d shared no-threads no-tests no-asm enable-asan no-cached-fetch no-async
+    sed -i 's@CC=$(CROSS_COMPILE)gcc.*@CC=clang@g' Makefile
+    sed -i 's@CXX=$(CROSS_COMPILE)g++.*@CXX=clang++@g' Makefile
+    sed -i 's/CFLAGS=.*/CFLAGS=-fPIC -O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER -DSGFUZZ -fsanitize=address -fsanitize=fuzzer-no-link -Wno-int-conversion/g' Makefile
+    sed -i 's/CXXFLAGS=.*/CXXFLAGS=-fPIC -O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER -DSGFUZZ -fsanitize=address -fsanitize=fuzzer-no-link -Wno-int-conversion/g' Makefile
+    sed -i 's@-Wl,-z,defs@@g' Makefile
+    sed -i "s/ main/ HonggfuzzNetDriver_main/g" apps/openssl.c
+    set +e
+    CC=clang-10 CXX=clang++-10 CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address" ./config no-shared
+    make build_generated
+    set -e
+    clang++-10 -fsanitize=fuzzer-no-link -fsanitize=address -lsFuzzer -lhfnetdriver -lhfcommon \
+        -pthread -m64 -Wa,--noexecstack -Qunused-arguments -Wall -O3 -L.   \
+        -o apps/openssl \
+        apps/lib/openssl-bin-cmp_mock_srv.o \
+        apps/openssl-bin-asn1parse.o apps/openssl-bin-ca.o \
+        apps/openssl-bin-ciphers.o apps/openssl-bin-cmp.o \
+        apps/openssl-bin-cms.o apps/openssl-bin-crl.o \
+        apps/openssl-bin-crl2pkcs7.o apps/openssl-bin-dgst.o \
+        apps/openssl-bin-dhparam.o apps/openssl-bin-dsa.o \
+        apps/openssl-bin-dsaparam.o apps/openssl-bin-ec.o \
+        apps/openssl-bin-ecparam.o apps/openssl-bin-enc.o \
+        apps/openssl-bin-engine.o apps/openssl-bin-errstr.o \
+        apps/openssl-bin-fipsinstall.o apps/openssl-bin-gendsa.o \
+        apps/openssl-bin-genpkey.o apps/openssl-bin-genrsa.o \
+        apps/openssl-bin-info.o apps/openssl-bin-kdf.o \
+        apps/openssl-bin-list.o apps/openssl-bin-mac.o \
+        apps/openssl-bin-nseq.o apps/openssl-bin-ocsp.o \
+        apps/openssl-bin-openssl.o apps/openssl-bin-passwd.o \
+        apps/openssl-bin-pkcs12.o apps/openssl-bin-pkcs7.o \
+        apps/openssl-bin-pkcs8.o apps/openssl-bin-pkey.o \
+        apps/openssl-bin-pkeyparam.o apps/openssl-bin-pkeyutl.o \
+        apps/openssl-bin-prime.o apps/openssl-bin-progs.o \
+        apps/openssl-bin-rand.o apps/openssl-bin-rehash.o \
+        apps/openssl-bin-req.o apps/openssl-bin-rsa.o \
+        apps/openssl-bin-rsautl.o apps/openssl-bin-s_client.o \
+        apps/openssl-bin-s_server.o apps/openssl-bin-s_time.o \
+        apps/openssl-bin-sess_id.o apps/openssl-bin-smime.o \
+        apps/openssl-bin-speed.o apps/openssl-bin-spkac.o \
+        apps/openssl-bin-srp.o apps/openssl-bin-storeutl.o \
+        apps/openssl-bin-ts.o apps/openssl-bin-verify.o \
+        apps/openssl-bin-version.o apps/openssl-bin-x509.o \
+        apps/libapps.a -lssl -lcrypto -ldl -pthread
+
+    echo "done!"
 }
+
+function run_sgfuzz{
+    timeout=$1
+    outdir=/tmp/fuzzing-output
+    indir=${HOME}/profuzzbench/subjects/TLS/OpenSSL/in-tls
+    pushd ${HOME}/target/sgfuzz/openssl >/dev/null
+
+    mkdir -p $outdir
+    rm -rf $outdir/*
+
+    SGFuzzPara="-close_fd_mask=3 -shrink=1 -print_full_coverage=1 -check_input_sha1=1 -reduce_inputs=1 \
+                -max_total_time=${timeout} -reload=30 -print_final_stats=1 -detect_leaks=0 ${outdir} ${indir}"
+    OpenSSLPara="s_server -key ../key.pem -cert ../cert.pem -4 -no_anti_replay"
+    ./apps/openssl ${SGFuzzPara} -- ${OpenSSLPara}
+}
+
+
 
 function build_ft_generator {
     mkdir -p target/ft/generator
@@ -252,6 +322,8 @@ function run_pingu {
 
     popd >/dev/null
 }
+
+
 
 function build_gcov {
     mkdir -p target/gcov/consumer
