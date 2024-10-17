@@ -10,6 +10,10 @@ source scripts/utils.sh
 args=($(get_args_before_double_dash "$@"))
 fuzzer_args=$(get_args_after_double_dash "$@")
 
+# echo "args: ${args[@]}"
+# echo "fuzzer_args: $fuzzer_args"
+
+
 opt_args=$(getopt -o o:f:t:v: -l output:,fuzzer:,generator:,target:,version:,times:,timeout:,cleanup,detached,dry-run -- "${args[@]}")
 if [ $? != 0 ]; then
     log_error "[!] Error in parsing shell arguments."
