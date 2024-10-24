@@ -8,7 +8,7 @@ args=($(get_args_before_double_dash "$@"))
 docker_args=$(get_args_after_double_dash "$@")
 
 # Check if the pingu-eval image exists, if not, build it
-if ! docker image inspect pingu-eval:latest > /dev/null 2>&1; then
+
     log_success "[+] pingu-eval image does not exist. Building now..."
     DOCKER_BUILDKIT=1 docker build --build-arg USER_ID="$(id -u)" --build-arg GROUP_ID="$(id -g)" -t pingu-eval:latest $docker_args -f scripts/Dockerfile-eval .
     if [[ $? -ne 0 ]]; then
@@ -17,12 +17,11 @@ if ! docker image inspect pingu-eval:latest > /dev/null 2>&1; then
     else
         log_success "[+] pingu-eval image successfully built"
     fi
-else
-    log_success "[+] pingu-eval image already exists"
-fi
+
+
 
 # Check if the pingu-eval container exists, if not, run a container with tail -f /dev/null
-if ! docker container inspect pingu-eval > /dev/null 2>&1; then
+
     log_success "[+] pingu-eval container does not exist. Running now..."
     docker run -d --name pingu-eval -v .:/home/user/profuzzbench --network=host pingu-eval:latest
     if [[ $? -ne 0 ]]; then
@@ -31,9 +30,7 @@ if ! docker container inspect pingu-eval > /dev/null 2>&1; then
     else
         log_success "[+] pingu-eval container successfully started, jupyter lab is running at http://localhost:38888"
     fi
-else
-    log_success "[+] pingu-eval container already exists"
-fi
+
 
 opt_args=$(getopt -o f:t:v:o:c: -l fuzzer:,target:,version:,generator:,output:,count:,summary --name "$0" -- "${args[@]}")
 if [ $? != 0 ]; then
@@ -127,9 +124,16 @@ for output_folder in "${output_folders[@]}"; do
     coverage_file="${output_folder}/coverage.csv"
     coverage_files+=("${coverage_file}")
 done
+echo "${coverage_files[@]}"
 
 if [[ -n "$summary" ]]; then
     docker exec -w /home/user/profuzzbench -it pingu-eval python3 scripts/evaluation/summary.py "${coverage_files[@]}"
-else 
-    docker exec -w /home/user/profuzzbench -it pingu-eval python3 scripts/evaluation/plot.py -c 60 -s 1 -o "${output_tar_prefix}-coverage.png" "${coverage_files[@]}"
+    
+else
+   
+    docker exec -w /home/user/profuzzbench -it pingu-eval python3 scripts/plot.py -c 60 -s 1 -o "${output_tar_prefix}-coverage.png" "${coverage_files[@]}"
 fi
+
+
+
+########

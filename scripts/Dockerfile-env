@@ -30,7 +30,7 @@ RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.l
 # Install common dependencies
 ENV DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/var/lib/apt \
-    apt update -y && yes | unminimize && apt-mark hold "llvm-*" && apt-mark hold "clang-*" && \
+    apt update -y  && apt-mark hold "llvm-*" && apt-mark hold "clang-*" && \
     apt install -y \
     apt-utils git build-essential mold curl libc++-dev sudo libtool libtool-bin libz-dev libglib2.0-dev graphviz-dev bison flex automake libpixman-1-dev cgroup-tools \
     cmake bear autoconf pkg-config gdb strace \

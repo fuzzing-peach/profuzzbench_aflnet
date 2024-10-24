@@ -23,7 +23,7 @@ RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 
 # Install common dependencies
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update -y && yes | unminimize && apt upgrade -y && \
+RUN apt-get update && apt-get upgrade -y&& \
     apt install -y \
     clang-17 llvm-17 llvm-17-dev lldb-17 lld-17 \
     apt-utils git build-essential mold curl libc++-dev sudo libtool libtool-bin libz-dev libglib2.0-dev graphviz-dev bison flex automake libpixman-1-dev cgroup-tools \

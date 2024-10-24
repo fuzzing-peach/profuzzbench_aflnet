@@ -5,7 +5,7 @@ function checkout {
     git clone https://gitee.com/sz_abundance/openssl.git repo/openssl
     pushd repo/openssl >/dev/null
     git checkout "$@"
-    git apply ${HOME}/profuzzbench/subjects/TLS/OpenSSL/ft-openssl.patch
+   
     popd >/dev/null
 }
 
@@ -19,7 +19,7 @@ function replay {
         -accept 4433 -4
     wait
 }
-
+/grcov
 function build_aflnet {
     mkdir -p target/aflnet
     rm -rf target/aflnet/*
