@@ -88,6 +88,15 @@ RUN zsh -c ". ~/.zshrc"
 # Environments and fuzzer tools
 ##############
 
+# AFLNet
+# We need aflnet-replay to replay all the testcases
+RUN git clone https://gitee.com/skyworld123/aflnet.git && \
+    cd aflnet && \
+    git checkout 62d63a59230bb5f5c6e54cddd381b9425dba3726 && \
+    git apply /tmp/patches/aflnet.patch && \
+    make clean all ${MAKE_OPT} && \
+    cd llvm_mode && make ${MAKE_OPT}
+
 # StateAFL
 ENV STATEAFL_CFLAGS="-DENABLE_TRACE_GLOBAL_DATA -DBLACKLIST_ALLOC_SITES -DBLACKLIST_GLOBALS"
 RUN sudo apt update && sudo DEBIAN_FRONTEND=noninteractive apt install -y tshark && sudo pip3 install --proxy=${HTTP_PROXY} --break-system-packages -i https://mirrors.aliyun.com/pypi/simple pyshark
