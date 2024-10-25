@@ -61,14 +61,15 @@ function run_aflnet {
         -k ${HOME}/profuzzbench/test.key.pem \
         -e -p 4433
 
-    # clear the gcov data before computing coverage
-    gcovr -r . -s -d >/dev/null 2>&1
-
     list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
     cov_cmd="gcovr -r . -s | grep \"[lb][a-z]*:\""
     cd ${HOME}/target/gcov/consumer/wolfssl
+
+    # clear the gcov data before computing coverage
+    gcovr -r . -s -d >/dev/null 2>&1
+
     compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv "$cov_cmd"
-    grcov --branch --threads 2 -s . -t html . -o ${outdir}/cov_html
+    gcovr -r . --html --html-details -o ${outdir}/cov_html/index.html
 
     popd >/dev/null
 }

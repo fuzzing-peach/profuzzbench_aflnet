@@ -66,12 +66,12 @@ function run_aflnet {
         -accept 4433 -4
 
     list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
+    cov_cmd="gcovr -r . -s | grep \"[lb][a-z]*:\""
     cd ${HOME}/target/gcov/consumer/openssl
     
     # clear the gcov data before computing coverage
     gcovr -r . -s -d >/dev/null 2>&1
     
-    cov_cmd="gcovr -r . -s | grep \"[lb][a-z]*:\""
     compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv "$cov_cmd"
     mkdir -p ${outdir}/cov_html
     gcovr -r . --html --html-details -o ${outdir}/cov_html/index.html
