@@ -82,9 +82,6 @@ RUN zsh -c ". ~/.zshrc"
 ##############
 # End of user setup
 
-# Code
-##############
-
 # Environments and fuzzer tools
 ##############
 
