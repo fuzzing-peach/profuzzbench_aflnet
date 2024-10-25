@@ -78,6 +78,7 @@ COPY patches /tmp/patches
 COPY scripts/.zshrc ${HOME}/.zshrc
 COPY scripts/.p10k.zsh ${HOME}/.p10k.zsh
 RUN zsh -c ". ~/.zshrc"
+
 ##############
 # End of user setup
 
