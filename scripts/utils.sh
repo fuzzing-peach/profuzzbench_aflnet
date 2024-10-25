@@ -76,14 +76,23 @@ function compute_coverage {
   testcases=$(eval "$2")
   step=$3
   covfile=$4
+  clean_cmd=$5
+  cov_cmd=$6
 
   # delete the existing coverage file
   rm $covfile || true
   touch $covfile
 
   # clear gcov data
-  gcovr -r . -s -d >/dev/null 2>&1
+  # run clean_cmd to clear gcov data
+  if [ -n "$clean_cmd" ]; then
+    eval "$clean_cmd"
+  else
+    # If no specific clean command is provided, use the default gcov reset
+    find . -name "*.gcda" -delete
+  fi
 
+  echo "gcovr is done"
   # output the header of the coverage file which is in the CSV format
   # Time: timestamp, l_per/b_per and l_abs/b_abs: line/branch coverage in percentage and absolutate number
   echo "time,l_abs,l_per,b_abs,b_per"
@@ -100,7 +109,12 @@ function compute_coverage {
     count=$((count + 1))
     rem=$((count % step))
     if [ "$rem" != "0" ]; then continue; fi
-    cov_data=$(gcovr -r . -s | grep "[lb][a-z]*:")
+    # Run the coverage command if provided, otherwise use default gcovr command
+    if [ -n "$cov_cmd" ]; then
+        cov_data=$(eval "$cov_cmd")
+    else
+        cov_data=$(gcovr -r . -s | grep "[lb][a-z]*:")
+    fi
     l_per=$(echo "$cov_data" | grep lines | cut -d" " -f2 | rev | cut -c2- | rev)
     l_abs=$(echo "$cov_data" | grep lines | cut -d" " -f3 | cut -c2-)
     b_per=$(echo "$cov_data" | grep branch | cut -d" " -f2 | rev | cut -c2- | rev)
@@ -112,7 +126,12 @@ function compute_coverage {
   # output cov data for the last testcase(s) if step > 1
   if [[ $step -gt 1 ]]; then
     time=$(stat -c %Y $f)
-    cov_data=$(gcovr -r . -s | grep "[lb][a-z]*:")
+    # Run the coverage command if provided, otherwise use default gcovr command
+    if [ -n "$cov_cmd" ]; then
+        cov_data=$(eval "$cov_cmd")
+    else
+        cov_data=$(gcovr -r . -s | grep "[lb][a-z]*:")
+    fi
     l_per=$(echo "$cov_data" | grep lines | cut -d" " -f2 | rev | cut -c2- | rev)
     l_abs=$(echo "$cov_data" | grep lines | cut -d" " -f3 | cut -c2-)
     b_per=$(echo "$cov_data" | grep branch | cut -d" " -f2 | rev | cut -c2- | rev)

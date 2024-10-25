@@ -2,21 +2,21 @@
 
 function checkout {
     mkdir -p repo
-    git clone https://gitee.com/sz_abundance/openssl.git repo/openssl
-    pushd repo/openssl >/dev/null
+    git clone https://github.com/rgaufman/live555.git repo/live555
+    pushd repo/live555 >/dev/null
     git checkout "$@"
-    git apply ${HOME}/profuzzbench/subjects/TLS/OpenSSL/ft-openssl.patch
+    git apply ${HOME}/profuzzbench/subjects/RTSP/Live555/ft-live555.patch
     popd >/dev/null
 }
 
 function replay {
-    # the process launching order is confusing.
-    ${HOME}/stateafl/aflnet-replay $1 TLS 4433 100 &
+    # 启动后台的aflnet-replay
+    /home/user/stateafl/aflnet-replay $1 RTSP 8554 1 &
+
+    # 预加载gcov和伪随机库，并限制服务器运行3秒
     LD_PRELOAD=libgcov_preload.so:libfake_random.so FAKE_RANDOM=1 \
-        timeout -k 1s 3s ./apps/openssl s_server \
-        -cert ${HOME}/profuzzbench/test.fullchain.pem \
-        -key ${HOME}/profuzzbench/test.key.pem \
-        -accept 4433 -4
+    timeout -k 0 3s ./testOnDemandRTSPServer 8554
+
     wait
 }
 
@@ -43,6 +43,7 @@ function build_aflnet {
 }
 
 function run_aflnet {
+    # echo "run_aflnet is called"
     timeout=$1
     outdir=/tmp/fuzzing-output
     indir=${HOME}/profuzzbench/subjects/TLS/OpenSSL/in-tls
@@ -56,6 +57,7 @@ function run_aflnet {
     export FAKE_RANDOM=1 # fake_random is not working with -DFT_FUZZING enabled
     export ASAN_OPTIONS="abort_on_error=1:symbolize=0:detect_leaks=0:handle_abort=2:handle_segv=2:handle_sigbus=2:handle_sigill=2:detect_stack_use_after_return=0:detect_odr_violation=0"
 
+    # echo "export is used"
     timeout -k 0 --preserve-status $timeout \
         ${HOME}/aflnet/afl-fuzz -d -i $indir \
         -o $outdir -N tcp://127.0.0.1/4433 \
@@ -65,6 +67,7 @@ function run_aflnet {
         -key ${HOME}/profuzzbench/test.key.pem \
         -accept 4433 -4
 
+    # echo "timeout is called"
     list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
     cd ${HOME}/target/gcov/consumer/openssl
     compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv
@@ -77,19 +80,22 @@ function run_aflnet {
 function build_stateafl {
     mkdir -p target/stateafl
     rm -rf target/stateafl/*
-    cp -r repo/openssl target/stateafl/openssl
-    pushd target/stateafl/openssl >/dev/null
-
-    export AFL_SKIP_CPUFREQ=1
+    cp -r repo/live555 target/stateafl/live555
+    pushd target/stateafl/live555 >/dev/null
+   
     export CC=${HOME}/stateafl/afl-clang-fast
     export CXX=${HOME}/stateafl/afl-clang-fast++
-    export CFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -fsanitize=address -DFT_FUZZING -DFT_CONSUMER"
-    export CXXFLAGS="-O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -fsanitize=address -DFT_FUZZING -DFT_CONSUMER"
+    export CFLAGS="-g -O3 -fsanitize=address -DFT_FUZZING -DFT_CONSUMER"
+    export CXXFLAGS="-g -O3 -fsanitize=address -DFT_FUZZING -DFT_CONSUMER"
+    export LDFLAGS="-fsanitize=address"
 
-    ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async enable-asan
-    bear -- make ${MAKE_OPT}
-
-    rm -rf fuzz test .git doc
+    # ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async enable-asan
+    # bear -- make ${MAKE_OPT}
+    sed -i "s@^C_COMPILER.*@C_COMPILER = $CC@g" config.linux
+    sed -i "s@^CPLUSPLUS_COMPILER.*@CPLUSPLUS_COMPILER = $CXX@g" config.linux
+    sed -i "s@^LINK =.*@LINK = $CXX -o@g" config.linux
+    ./genMakefiles linux
+    make -j
 
     popd >/dev/null
 }
@@ -97,8 +103,8 @@ function build_stateafl {
 function run_stateafl {
     timeout=$1
     outdir=/tmp/fuzzing-output
-    indir=${HOME}/profuzzbench/subjects/TLS/OpenSSL/in-tls-replay
-    pushd ${HOME}/target/stateafl/openssl >/dev/null
+    indir=${HOME}/profuzzbench/subjects/RTSP/Live555/in-rtsp-replay
+    pushd ${HOME}/target/stateafl/live555/testProgs >/dev/null
 
     mkdir -p $outdir
     rm -rf $outdir/*
@@ -110,18 +116,15 @@ function run_stateafl {
 
     timeout -k 0 --preserve-status $timeout \
         ${HOME}/stateafl/afl-fuzz -d -i $indir \
-        -o $outdir -N tcp://127.0.0.1/4433 \
-        -P TLS -D 10000 -q 3 -s 3 -E -K -R -W 50 -m none -t 1000 \
-        ./apps/openssl s_server \
-        -cert ${HOME}/profuzzbench/test.fullchain.pem \
-        -key ${HOME}/profuzzbench/test.key.pem \
-        -accept 4433 -4
+        -o $outdir -N tcp://127.0.0.1/8554 \
+        -P TLS -D 10000 -q 3 -s 3 -E -K -R -m none -t 1000 \
+        ./testOnDemandRTSPServer 8554
 
     list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
-    cd ${HOME}/target/gcov/consumer/openssl
+    cd ${HOME}/target/gcov/consumer/live555/testProgs
     compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv
     mkdir -p ${outdir}/cov_html
-    gcovr -r . --html --html-details -o ${outdir}/cov_html/index.html
+    gcovr -r .. --html --html-details -o ${outdir}/cov_html/index.html
 
     popd >/dev/null
 }
@@ -285,14 +288,29 @@ function run_pingu {
 function build_gcov {
     mkdir -p target/gcov/consumer
     rm -rf target/gcov/consumer/*
-    cp -r repo/openssl target/gcov/consumer/openssl
-    pushd target/gcov/consumer/openssl >/dev/null
+    cp -r repo/live555 target/gcov/consumer/live555
+    pushd target/gcov/consumer/live555 >/dev/null
 
-    export CFLAGS="-fprofile-arcs -ftest-coverage -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER"
+    # export CFLAGS="-fprofile-arcs -ftest-coverage -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER"
+    # export LDFLAGS="-fprofile-arcs -ftest-coverage"
+
+    # ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async
+    # bear -- make ${MAKE_OPT}
+
+    # rm -rf fuzz test .git doc
+
+    # popd >/dev/null
+
+    export CFLAGS="-fprofile-arcs -ftest-coverage"
+    export CPPFLAGS="-fprofile-arcs -ftest-coverage"
+    export CXXFLAGS="-fprofile-arcs -ftest-coverage"
     export LDFLAGS="-fprofile-arcs -ftest-coverage"
 
-    ./config --with-rand-seed=devrandom no-shared no-threads no-tests no-asm no-cached-fetch no-async
-    bear -- make ${MAKE_OPT}
+    # sed -i "s@^C_COMPILER.*@C_COMPILER = $CC@g" config.linux
+    # sed -i "s@^CPLUSPLUS_COMPILER.*@CPLUSPLUS_COMPILER = $CXX@g" config.linux
+    # sed -i "s@^LINK =.*@LINK = $CXX -o@g" config.linux
+    ./genMakefiles linux
+    make -j
 
     rm -rf fuzz test .git doc
 
