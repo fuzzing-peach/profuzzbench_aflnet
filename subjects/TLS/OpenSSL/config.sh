@@ -11,7 +11,7 @@ function checkout {
 
 function replay {
     # the process launching order is confusing.
-    ${HOME}/stateafl/aflnet-replay $1 TLS 4433 100 &
+    ${HOME}/aflnet/aflnet-replay $1 TLS 4433 100 &
     LD_PRELOAD=libgcov_preload.so:libfake_random.so FAKE_RANDOM=1 \
         timeout -k 1s 3s ./apps/openssl s_server \
         -cert ${HOME}/profuzzbench/test.fullchain.pem \
@@ -67,7 +67,12 @@ function run_aflnet {
 
     list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
     cd ${HOME}/target/gcov/consumer/openssl
-    compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv
+    
+    # clear the gcov data before computing coverage
+    gcovr -r . -s -d >/dev/null 2>&1
+    
+    cov_cmd="gcovr -r . -s | grep \"[lb][a-z]*:\""
+    compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv "$cov_cmd"
     mkdir -p ${outdir}/cov_html
     gcovr -r . --html --html-details -o ${outdir}/cov_html/index.html
 
@@ -117,9 +122,14 @@ function run_stateafl {
         -key ${HOME}/profuzzbench/test.key.pem \
         -accept 4433 -4
 
+    # clear the gcov data before computing coverage
+    gcovr -r . -s -d >/dev/null 2>&1
+
+    cov_cmd="gcovr -r . -s | grep \"[lb][a-z]*:\""
     list_cmd="ls -1 ${outdir}/replayable-queue/id* | tr '\n' ' ' | sed 's/ $//'"
     cd ${HOME}/target/gcov/consumer/openssl
-    compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv
+
+    compute_coverage replay "$list_cmd" 1 ${outdir}/coverage.csv "$cov_cmd"
     mkdir -p ${outdir}/cov_html
     gcovr -r . --html --html-details -o ${outdir}/cov_html/index.html
 

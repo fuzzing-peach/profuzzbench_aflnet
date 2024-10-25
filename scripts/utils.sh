@@ -76,23 +76,12 @@ function compute_coverage {
   testcases=$(eval "$2")
   step=$3
   covfile=$4
-  clean_cmd=$5
-  cov_cmd=$6
+  cov_cmd=$5
 
   # delete the existing coverage file
   rm $covfile || true
   touch $covfile
 
-  # clear gcov data
-  # run clean_cmd to clear gcov data
-  if [ -n "$clean_cmd" ]; then
-    eval "$clean_cmd"
-  else
-    # If no specific clean command is provided, use the default gcov reset
-    find . -name "*.gcda" -delete
-  fi
-
-  echo "gcovr is done"
   # output the header of the coverage file which is in the CSV format
   # Time: timestamp, l_per/b_per and l_abs/b_abs: line/branch coverage in percentage and absolutate number
   echo "time,l_abs,l_per,b_abs,b_per"
