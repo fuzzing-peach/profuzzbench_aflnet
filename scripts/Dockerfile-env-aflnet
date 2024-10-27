@@ -113,8 +113,3 @@ RUN gcc -shared -fpic fake_random.c -g -o libfake_random.so && \
 # Disable ASLR fowever
 RUN echo "kernel.randomize_va_space = 0" | sudo tee -a /etc/sysctl.d/01-disable-aslr.conf && \
     sudo sysctl -p /etc/sysctl.d/01-disable-aslr.conf
-
-COPY scripts/check_aslr.c check_aslr.c
-COPY scripts/check_aslr_child.c check_aslr_child.c
-RUN gcc -o check_aslr check_aslr.c && \
-    gcc -o check_aslr_child check_aslr_child.c
