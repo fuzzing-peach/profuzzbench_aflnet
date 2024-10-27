@@ -122,9 +122,9 @@ The parameters specified after the **--** are the build arguments passed directl
 
 | Fuzzer   | Dockerfile                                         | Status                                                                                                                                                                                                                         |
 | -------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| AFLNet   | [Dockerfile-aflnet](scripts/Dockerfile-aflnet)     | [![pingu-env-aflnet CI](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-aflnet-CI.yml/badge.svg)](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-aflnet-CI.yml)       |
-| StateAFL | [Dockerfile-stateafl](scripts/Dockerfile-stateafl) | [![pingu-env-stateafl CI](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-stateafl-CI.yml/badge.svg)](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-stateafl-CI.yml) |
-| SGFuzz   | [Dockerfile-sgfuzz](scripts/Dockerfile-sgfuzz)     | [![pingu-env-sgfuzz CI](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-sgfuzz-CI.yml/badge.svg)](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-sgfuzz-CI.yml)       |
+| AFLNet   | [Dockerfile-aflnet](scripts/Dockerfile-env-aflnet)     | [![pingu-env-aflnet CI](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-aflnet-CI.yml/badge.svg)](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-aflnet-CI.yml)       |
+| StateAFL | [Dockerfile-stateafl](scripts/Dockerfile-env-stateafl) | [![pingu-env-stateafl CI](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-stateafl-CI.yml/badge.svg)](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-stateafl-CI.yml) |
+| SGFuzz   | [Dockerfile-sgfuzz](scripts/Dockerfile-env-sgfuzz)     | [![pingu-env-sgfuzz CI](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-sgfuzz-CI.yml/badge.svg)](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-sgfuzz-CI.yml)       |
 
 ## Step-1.5. (Optional) Launch the development environment
 
