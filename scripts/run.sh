@@ -126,7 +126,7 @@ for i in $(seq 1 $times); do
         -v /etc/localtime:/etc/localtime:ro \
         -v /etc/timezone:/etc/timezone:ro \
         -v .:/home/user/profuzzbench \
-        -v ${output}/${cname}:/tmp/fuzzing-output \
+        -v ${output}/${cname}:/tmp/fuzzing-output:rw \
         --mount type=tmpfs,destination=/tmp,tmpfs-mode=777 \
         --ulimit msgqueue=2097152000 \
         --shm-size=64G \
