@@ -118,6 +118,14 @@ Arguments:
 
 The parameters specified after the **--** are the build arguments passed directly for the docker build command. You can specify sth like `--network=host --build-arg HTTP_PROXY=xxx`. Check the [Dockerfile-env](scripts/Dockerfile-env) to see the available build arguments.
 
+### CI status of the base images
+
+| Fuzzer   | Dockerfile                                         | Status                                                                                                                                                                                                                         |
+| -------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| AFLNet   | [Dockerfile-aflnet](scripts/Dockerfile-aflnet)     | [![pingu-env-aflnet CI](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-aflnet-CI.yml/badge.svg)](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-aflnet-CI.yml)       |
+| StateAFL | [Dockerfile-stateafl](scripts/Dockerfile-stateafl) | [![pingu-env-stateafl CI](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-stateafl-CI.yml/badge.svg)](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-stateafl-CI.yml) |
+| SGFuzz   | [Dockerfile-sgfuzz](scripts/Dockerfile-sgfuzz)     | [![pingu-env-sgfuzz CI](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-sgfuzz-CI.yml/badge.svg)](https://github.com/fuzzing-peach/pingufuzzbench/actions/workflows/pingu-env-sgfuzz-CI.yml)       |
+
 ## Step-1.5. (Optional) Launch the development environment
 
 ```sh
