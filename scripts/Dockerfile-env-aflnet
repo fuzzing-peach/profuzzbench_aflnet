@@ -75,8 +75,8 @@ RUN git config --global http.version HTTP/1.1 && \
     git config --global user.email zdkscope@qq.com
     
 COPY patches /tmp/patches
-COPY scripts/.zshrc ${HOME}/.zshrc
-COPY scripts/.p10k.zsh ${HOME}/.p10k.zsh
+COPY --chown=user:user scripts/.zshrc ${HOME}/.zshrc
+COPY --chown=user:user scripts/.p10k.zsh ${HOME}/.p10k.zsh
 RUN zsh -c ". ~/.zshrc"
 
 ##############
@@ -113,3 +113,8 @@ RUN gcc -shared -fpic fake_random.c -g -o libfake_random.so && \
 # Disable ASLR fowever
 RUN echo "kernel.randomize_va_space = 0" | sudo tee -a /etc/sysctl.d/01-disable-aslr.conf && \
     sudo sysctl -p /etc/sysctl.d/01-disable-aslr.conf
+
+COPY scripts/check_aslr.c check_aslr.c
+COPY scripts/check_aslr_child.c check_aslr_child.c
+RUN gcc -o check_aslr check_aslr.c && \
+    gcc -o check_aslr_child check_aslr_child.c
