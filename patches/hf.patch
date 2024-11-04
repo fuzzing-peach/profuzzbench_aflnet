@@ -1,0 +1,13 @@
+diff --git a/libhfnetdriver/netdriver.c b/libhfnetdriver/netdriver.c
+index 3e11f71..6d73585 100644
+--- a/libhfnetdriver/netdriver.c
++++ b/libhfnetdriver/netdriver.c
+@@ -387,7 +387,7 @@ int LLVMFuzzerInitialize(int *argc, char ***argv) {
+     *argc = HonggfuzzNetDriverArgsForServer(
+         *argc, *argv, &hfnd_globals.argc_server, &hfnd_globals.argv_server);
+ 
+-    netDriver_initNsIfNeeded();
++    // netDriver_initNsIfNeeded();
+     netDriver_startOriginalProgramInThread();
+     for (;;) {
+         if (netDriver_checkIfServerReady(*argc, *argv)) {

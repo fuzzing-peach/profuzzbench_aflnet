@@ -98,8 +98,8 @@ RUN git clone https://gitee.com/skyworld123/aflnet.git && \
     cd llvm_mode && make ${MAKE_OPT}
 
 # SGFuzz
-RUN git clone https://gitee.com/pine404/SGFuzz.git --depth=1 && \
-    cd SGFuzz && \
+RUN git clone https://gitee.com/pine404/SGFuzz.git --depth=2 sgfuzz && \
+    cd sgfuzz && \
     git checkout 00dbbd70ba79f1bcff3f7dfdb4fda0645cf91225 && \
     git apply /tmp/patches/sgfuzz.patch && \
     ./build.sh && \
@@ -108,8 +108,9 @@ RUN git clone https://gitee.com/pine404/SGFuzz.git --depth=1 && \
 # Install hongfuzz netdrive that is used by SGFuzz
 RUN git clone https://gitee.com/kherrisan/honggfuzz.git --depth=1 && \
     cd honggfuzz && \
+    git apply /tmp/patches/hf.patch && \
     CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address" make libhfcommon/libhfcommon.a && \
-    CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address -DHFND_RECVTIME=1" make libhfnetdriver/libhfnetdriver.a && \
+    CC=clang CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address -DHFND_RECVTIME=1 -Wno-error=unused-function" make libhfnetdriver/libhfnetdriver.a && \
     sudo mv libhfcommon/libhfcommon.a /usr/lib/libhfcommon.a && \
     sudo mv libhfnetdriver/libhfnetdriver.a /usr/lib/libhfnetdriver.a
 
