@@ -119,6 +119,7 @@ for i in $(seq 1 $times); do
     ts=$(date +%s%3N)
     cname="${container_name}-${i}-${ts}"
     mkdir -p ${output}/${cname}
+    container_fuzzing_args="${fuzzer_args} -b ${i}"
     cmd="docker run -it -d \
         --cap-add=SYS_ADMIN --cap-add=SYS_RAWIO --cap-add=SYS_PTRACE \
         --security-opt seccomp=unconfined \
@@ -132,7 +133,7 @@ for i in $(seq 1 $times); do
         --shm-size=64G \
         --name $cname \
         $image_name \
-        /bin/bash -c \"bash /home/user/profuzzbench/scripts/dispatch.sh $target run $fuzzer $timeout ${fuzzer_args}\""
+        /bin/bash -c \"bash /home/user/profuzzbench/scripts/dispatch.sh $target run $fuzzer $timeout ${container_fuzzing_args}\""
     echo $cmd
     id=$(eval $cmd)
     log_success "[+] Launch docker container: ${cname}"

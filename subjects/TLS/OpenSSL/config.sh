@@ -101,6 +101,8 @@ function build_stateafl {
 
 function run_stateafl {
     timeout=$1
+    shift
+    fuzzer_args=$@
     outdir=/tmp/fuzzing-output
     indir=${HOME}/profuzzbench/subjects/TLS/OpenSSL/in-tls-replay
     pushd ${HOME}/target/stateafl/openssl >/dev/null
@@ -116,11 +118,11 @@ function run_stateafl {
     timeout -k 0 --preserve-status $timeout \
         ${HOME}/stateafl/afl-fuzz -d -i $indir \
         -o $outdir -N tcp://127.0.0.1/4433 \
-        -P TLS -D 10000 -q 3 -s 3 -E -K -R -W 50 -m none -t 1000 \
+        -P TLS -D 10000 -q 3 -s 3 -E -K -R -W 50 -m none -t 1000 $fuzzer_args \
         ./apps/openssl s_server \
         -cert ${HOME}/profuzzbench/test.fullchain.pem \
         -key ${HOME}/profuzzbench/test.key.pem \
-        -accept 4433 -4
+        -accept 4433 -4 > /tmp/fuzzing-output/stateafl.log 2>&1
 
     # clear the gcov data before computing coverage
     gcovr -r . -s -d >/dev/null 2>&1
@@ -146,19 +148,20 @@ function build_sgfuzz {
 
     python3 "${HOME}/sgfuzz/sanitizer/State_machine_instrument.py" ./ -b blocked_variables.txt
 
-    ./config -d shared no-threads no-tests no-asm enable-asan no-cached-fetch no-async
+    ./config -d no-shared no-threads no-tests no-asm enable-asan no-cached-fetch no-async
     sed -i 's@CC=$(CROSS_COMPILE)gcc.*@CC=clang@g' Makefile
     sed -i 's@CXX=$(CROSS_COMPILE)g++.*@CXX=clang++@g' Makefile
     sed -i 's/CFLAGS=.*/CFLAGS=-fPIC -O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER -DSGFUZZ -fsanitize=address -fsanitize=fuzzer-no-link -Wno-int-conversion/g' Makefile
     sed -i 's/CXXFLAGS=.*/CXXFLAGS=-fPIC -O3 -g -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER -DSGFUZZ -fsanitize=address -fsanitize=fuzzer-no-link -Wno-int-conversion/g' Makefile
     sed -i 's@-Wl,-z,defs@@g' Makefile
-    sed -i "s/ main/ HonggfuzzNetDriver_main/g" apps/openssl.c
+    
     set +e
-    CC=clang-10 CXX=clang++-10 CFLAGS="-fsanitize=fuzzer-no-link -fsanitize=address" ./config no-shared
-    make build_generated
+    bear -- make ${MAKE_OPT}
     set -e
-    clang++-10 -fsanitize=fuzzer-no-link -fsanitize=address -lsFuzzer -lhfnetdriver -lhfcommon \
-        -pthread -m64 -Wa,--noexecstack -Qunused-arguments -Wall -O3 -L.   \
+    
+    clang++ -fsanitize=fuzzer-no-link -fsanitize=address \
+        -pthread -m64 -Wa,--noexecstack -Qunused-arguments -Wall -O3 -L. -Wno-int-conversion \
+        -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -DFT_FUZZING -DFT_CONSUMER -DSGFUZZ \
         -o apps/openssl \
         apps/lib/openssl-bin-cmp_mock_srv.o \
         apps/openssl-bin-asn1parse.o apps/openssl-bin-ca.o \
@@ -188,12 +191,12 @@ function build_sgfuzz {
         apps/openssl-bin-srp.o apps/openssl-bin-storeutl.o \
         apps/openssl-bin-ts.o apps/openssl-bin-verify.o \
         apps/openssl-bin-version.o apps/openssl-bin-x509.o \
-        apps/libapps.a -lssl -lcrypto -ldl -pthread
+        apps/libapps.a -lssl -lcrypto -ldl -pthread -lsFuzzer -lhfnetdriver -lhfcommon
 
     echo "done!"
 }
 
-function run_sgfuzz{
+function run_sgfuzz {
     timeout=$1
     outdir=/tmp/fuzzing-output
     indir=${HOME}/profuzzbench/subjects/TLS/OpenSSL/in-tls
@@ -204,11 +207,9 @@ function run_sgfuzz{
 
     SGFuzzPara="-close_fd_mask=3 -shrink=1 -print_full_coverage=1 -check_input_sha1=1 -reduce_inputs=1 \
                 -max_total_time=${timeout} -reload=30 -print_final_stats=1 -detect_leaks=0 ${outdir} ${indir}"
-    OpenSSLPara="s_server -key ../key.pem -cert ../cert.pem -4 -no_anti_replay"
+    OpenSSLPara="s_server -key ${HOME}/profuzzbench/test.key.pem -cert ${HOME}/profuzzbench/test.fullchain.pem -4 -no_anti_replay -accept 4433 -4"
     ./apps/openssl ${SGFuzzPara} -- ${OpenSSLPara}
 }
-
-
 
 function build_ft_generator {
     mkdir -p target/ft/generator
